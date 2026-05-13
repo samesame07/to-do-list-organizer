@@ -30,6 +30,19 @@
           </div>
         </header>
 
+        <section class="cloud-strip" aria-label="Cloud sync status">
+          <div class="cloud-copy">
+            <strong id="cloudStatusLabel">Local only</strong>
+            <span id="cloudStatusDetail">Sign in to keep your board on the cloud.</span>
+          </div>
+          <div class="cloud-strip-actions">
+            <button class="cloud-pill" id="cloudSetupButton" type="button">Cloud Setup</button>
+            <button class="cloud-pill" id="authOpenButton" type="button">Sign In</button>
+            <button class="cloud-pill" id="syncNowButton" type="button" hidden>Sync Now</button>
+            <button class="cloud-pill" id="signOutButton" type="button" hidden>Sign Out</button>
+          </div>
+        </section>
+
         <div class="workbench">
           <aside class="preset-sidebar" aria-label="Saved presets">
             <div class="preset-heading">
@@ -156,6 +169,66 @@
       </section>
     </main>
 
+    <section class="cloud-modal-shell" id="cloudModal" hidden aria-hidden="true">
+      <div class="cloud-modal-backdrop" id="cloudModalBackdrop"></div>
+      <div class="cloud-modal" role="dialog" aria-modal="true" aria-labelledby="cloudModalTitle">
+        <header class="cloud-modal-head">
+          <div>
+            <span>Cloud Account</span>
+            <h2 id="cloudModalTitle">Save your board to the cloud</h2>
+          </div>
+          <button class="cloud-modal-close" id="cloudModalCloseButton" type="button">Close</button>
+        </header>
+
+        <div class="cloud-modal-grid">
+          <section class="cloud-panel">
+            <h3>Cloud Setup</h3>
+            <p>Paste your Supabase project URL and public key once.</p>
+
+            <label class="cloud-field" for="supabaseUrlInput">
+              <span>Project URL</span>
+              <input id="supabaseUrlInput" type="url" placeholder="https://your-project.supabase.co" />
+            </label>
+
+            <label class="cloud-field" for="supabaseAnonKeyInput">
+              <span>Publishable / anon key</span>
+              <textarea id="supabaseAnonKeyInput" rows="5" placeholder="sb_publishable_... or eyJ..."></textarea>
+            </label>
+
+            <div class="cloud-panel-actions">
+              <button class="cloud-primary" id="saveCloudConfigButton" type="button">Save Setup</button>
+              <button class="cloud-secondary" id="clearCloudConfigButton" type="button">Clear</button>
+            </div>
+          </section>
+
+          <section class="cloud-panel">
+            <h3>Account</h3>
+            <p id="authPanelStatus">Cloud setup required before sign in.</p>
+
+            <label class="cloud-field" for="authEmailInput">
+              <span>Email</span>
+              <input id="authEmailInput" type="email" placeholder="you@example.com" autocomplete="email" />
+            </label>
+
+            <label class="cloud-field" for="authPasswordInput">
+              <span>Password</span>
+              <input id="authPasswordInput" type="password" placeholder="At least 6 characters" minlength="6" autocomplete="current-password" />
+            </label>
+
+            <div class="cloud-panel-actions">
+              <button class="cloud-primary" id="signInButton" type="button">Sign In</button>
+              <button class="cloud-secondary" id="signUpButton" type="button">Create Account</button>
+            </div>
+
+            <p class="cloud-note">Once you sign in, your current board and preserved boards can sync across devices under that account.</p>
+          </section>
+        </div>
+
+        <p class="cloud-feedback" id="cloudFeedback"></p>
+      </div>
+    </section>
+
+    <script src="cloud-config.js"></script>
     <script src="script.js"></script>
   </body>
 </html>

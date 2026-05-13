@@ -27,7 +27,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -129,6 +130,39 @@ select {
   position: relative;
 }
 
+.cloud-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  background: #f9fafc;
+}
+
+.cloud-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.cloud-copy strong {
+  font-size: 0.92rem;
+  color: #273546;
+}
+
+.cloud-copy span {
+  color: #6d7581;
+  font-size: 0.8rem;
+}
+
+.cloud-strip-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .sheet-bar > div {
   display: flex;
   align-items: center;
@@ -166,7 +200,11 @@ select {
 }
 
 .save-pill,
-.quick-add button {
+.quick-add button,
+.cloud-pill,
+.cloud-primary,
+.cloud-secondary,
+.cloud-modal-close {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -188,8 +226,151 @@ select {
 }
 
 .save-pill *,
-.quick-add button * {
+.quick-add button *,
+.cloud-pill *,
+.cloud-primary *,
+.cloud-secondary *,
+.cloud-modal-close * {
   pointer-events: none;
+}
+
+.cloud-secondary,
+.cloud-modal-close {
+  background: #f7f8fa;
+  color: #3d444f;
+  border-color: #c8ccd5;
+}
+
+.cloud-pill[hidden] {
+  display: none;
+}
+
+.cloud-pill:disabled,
+.cloud-primary:disabled,
+.cloud-secondary:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.cloud-modal-shell[hidden] {
+  display: none;
+}
+
+.cloud-modal-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+}
+
+.cloud-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 13, 18, 0.54);
+}
+
+.cloud-modal {
+  position: relative;
+  z-index: 1;
+  width: min(920px, 100%);
+  border: 1px solid var(--line);
+  background: white;
+  box-shadow: 0 28px 70px rgba(12, 16, 24, 0.28);
+}
+
+.cloud-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 18px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.cloud-modal-head span {
+  display: block;
+  color: #717885;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+}
+
+.cloud-modal-head h2 {
+  margin: 4px 0 0;
+  font-size: 1.45rem;
+}
+
+.cloud-modal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.cloud-panel {
+  padding: 18px;
+}
+
+.cloud-panel + .cloud-panel {
+  border-left: 1px solid var(--line);
+}
+
+.cloud-panel h3 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+}
+
+.cloud-panel p,
+.cloud-note,
+.cloud-feedback {
+  color: #6d7581;
+  font-size: 0.88rem;
+}
+
+.cloud-field {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+}
+
+.cloud-field span {
+  color: #4f5662;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.cloud-field input,
+.cloud-field textarea {
+  width: 100%;
+  border: 1px solid #cfd5de;
+  background: #fbfcfd;
+  color: var(--ink);
+  padding: 10px 12px;
+}
+
+.cloud-field textarea {
+  min-height: 118px;
+  resize: vertical;
+}
+
+.cloud-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.cloud-feedback {
+  min-height: 24px;
+  margin: 0;
+  padding: 0 18px 18px;
+}
+
+.cloud-feedback.is-success {
+  color: #25643c;
+}
+
+.cloud-feedback.is-error {
+  color: #a13f3f;
 }
 
 .workbench {
@@ -923,6 +1104,24 @@ select {
 }
 
 @media (max-width: 850px) {
+  .cloud-strip {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cloud-strip-actions {
+    justify-content: stretch;
+  }
+
+  .cloud-modal-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cloud-panel + .cloud-panel {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+
   .caption-strip {
     min-height: 20vh;
     padding: 20px 18px 34px;
@@ -1013,6 +1212,24 @@ select {
 }
 
 @media (max-width: 680px) {
+  .cloud-strip {
+    padding: 10px;
+  }
+
+  .cloud-strip-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cloud-modal-shell {
+    padding: 10px;
+  }
+
+  .cloud-modal-head,
+  .cloud-panel {
+    padding: 14px;
+  }
+
   .caption-strip {
     min-height: 170px;
     padding: 18px 16px 28px;
@@ -1289,6 +1506,10 @@ select {
 }
 
 @media (max-width: 480px) {
+  .cloud-strip-actions {
+    grid-template-columns: 1fr;
+  }
+
   .muted {
     display: none;
   }

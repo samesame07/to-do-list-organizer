@@ -1,5 +1,8 @@
 const STORAGE_KEY = "organize-labs-todo-custom";
 const PRESET_KEY = "organize-labs-todo-presets";
+const CLOUD_CONFIG_KEY = "organize-labs-todo-cloud-config";
+const CLOUD_TABLE = "user_boards";
+const SUPABASE_MODULE_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 const days = ["M", "T", "W", "T", "F", "S", "S"];
 const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -137,7 +140,38 @@ const reviewBox = document.querySelector(".review-box");
 const mobileProgressHost = document.querySelector("#mobileProgressHost");
 const mobileActionsHost = document.querySelector("#mobileActionsHost");
 const mobileSidebarHost = document.querySelector("#mobileSidebarHost");
+const cloudStatusLabel = document.querySelector("#cloudStatusLabel");
+const cloudStatusDetail = document.querySelector("#cloudStatusDetail");
+const cloudSetupButton = document.querySelector("#cloudSetupButton");
+const authOpenButton = document.querySelector("#authOpenButton");
+const syncNowButton = document.querySelector("#syncNowButton");
+const signOutButton = document.querySelector("#signOutButton");
+const cloudModal = document.querySelector("#cloudModal");
+const cloudModalBackdrop = document.querySelector("#cloudModalBackdrop");
+const cloudModalCloseButton = document.querySelector("#cloudModalCloseButton");
+const supabaseUrlInput = document.querySelector("#supabaseUrlInput");
+const supabaseAnonKeyInput = document.querySelector("#supabaseAnonKeyInput");
+const saveCloudConfigButton = document.querySelector("#saveCloudConfigButton");
+const clearCloudConfigButton = document.querySelector("#clearCloudConfigButton");
+const authPanelStatus = document.querySelector("#authPanelStatus");
+const authEmailInput = document.querySelector("#authEmailInput");
+const authPasswordInput = document.querySelector("#authPasswordInput");
+const signInButton = document.querySelector("#signInButton");
+const signUpButton = document.querySelector("#signUpButton");
+const cloudFeedback = document.querySelector("#cloudFeedback");
 let selectedPresetId = "";
+let supabaseClient = null;
+let supabaseModulePromise = null;
+let activeCloudConfigSignature = "";
+let cloudSubscription = null;
+let cloudSession = null;
+let cloudUser = null;
+let cloudSyncTimer = null;
+let cloudSyncPending = false;
+let cloudSyncing = false;
+let lastCloudSyncAt = "";
+let loadedCloudUserId = "";
+let hydratingFromCloud = false;
 
 function getInitialSidebarState() {
   const saved = localStorage.getItem("organize-labs-sidebar-open");
@@ -178,6 +212,127 @@ function applyResponsiveLayout() {
       mainPanel.before(presetSidebar);
     }
   }
+}
+
+function getEmbeddedCloudConfig() {
+  const config = window.SUPABASE_CONFIG || {};
+  return {
+    url: typeof config.url === "string" ? config.url.trim() : "",
+    anonKey: typeof config.anonKey === "string" ? config.anonKey.trim() : "",
+  };
+}
+
+function getStoredCloudConfig() {
+  const saved = localStorage.getItem(CLOUD_CONFIG_KEY);
+  if (!saved) {
+    return { url: "", anonKey: "" };
+  }
+
+  try {
+    const config = JSON.parse(saved);
+    return {
+      url: typeof config.url === "string" ? config.url.trim() : "",
+      anonKey: typeof config.anonKey === "string" ? config.anonKey.trim() : "",
+    };
+  } catch {
+    return { url: "", anonKey: "" };
+  }
+}
+
+function getCloudConfig() {
+  const embedded = getEmbeddedCloudConfig();
+  if (embedded.url && embedded.anonKey) {
+    return embedded;
+  }
+  return getStoredCloudConfig();
+}
+
+function hasCloudConfig(config = getCloudConfig()) {
+  return Boolean(config.url && config.anonKey);
+}
+
+function saveCloudConfig(config) {
+  localStorage.setItem(CLOUD_CONFIG_KEY, JSON.stringify(config));
+}
+
+function clearCloudConfig() {
+  localStorage.removeItem(CLOUD_CONFIG_KEY);
+}
+
+function getCloudConfigSignature(config = getCloudConfig()) {
+  return `${config.url}::${config.anonKey}`;
+}
+
+function openCloudModal() {
+  fillCloudConfigFields();
+  cloudModal.hidden = false;
+  cloudModal.setAttribute("aria-hidden", "false");
+}
+
+function closeCloudModal() {
+  cloudModal.hidden = true;
+  cloudModal.setAttribute("aria-hidden", "true");
+}
+
+function fillCloudConfigFields() {
+  const config = getCloudConfig();
+  supabaseUrlInput.value = config.url;
+  supabaseAnonKeyInput.value = config.anonKey;
+}
+
+function setCloudFeedback(message = "", tone = "") {
+  cloudFeedback.textContent = message;
+  cloudFeedback.className = "cloud-feedback";
+  if (tone) {
+    cloudFeedback.classList.add(`is-${tone}`);
+  }
+}
+
+function formatCloudSyncTime(value) {
+  if (!value) return "";
+  return new Intl.DateTimeFormat("ja-JP", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function renderCloudState() {
+  const configured = hasCloudConfig();
+  const signedIn = Boolean(cloudUser);
+
+  if (!configured) {
+    cloudStatusLabel.textContent = "Local only";
+    cloudStatusDetail.textContent = "Add your Supabase project to keep this board across devices.";
+    authPanelStatus.textContent = "Cloud setup required before sign in.";
+  } else if (!signedIn) {
+    cloudStatusLabel.textContent = "Cloud ready";
+    cloudStatusDetail.textContent = "Create an account or sign in to sync this board.";
+    authPanelStatus.textContent = "Create an account or sign in with your email.";
+  } else if (cloudSyncing) {
+    cloudStatusLabel.textContent = "Syncing";
+    cloudStatusDetail.textContent = `Saving as ${cloudUser.email || "your account"}...`;
+    authPanelStatus.textContent = `Signed in as ${cloudUser.email || "your account"}.`;
+  } else if (cloudSyncPending) {
+    cloudStatusLabel.textContent = "Sync queued";
+    cloudStatusDetail.textContent = `Changes are waiting to save for ${cloudUser.email || "your account"}.`;
+    authPanelStatus.textContent = `Signed in as ${cloudUser.email || "your account"}.`;
+  } else {
+    cloudStatusLabel.textContent = "Cloud connected";
+    cloudStatusDetail.textContent = lastCloudSyncAt
+      ? `Saved to ${cloudUser.email || "your account"} at ${formatCloudSyncTime(lastCloudSyncAt)}.`
+      : `Signed in as ${cloudUser.email || "your account"}.`;
+    authPanelStatus.textContent = `Signed in as ${cloudUser.email || "your account"}.`;
+  }
+
+  authOpenButton.textContent = signedIn ? "Account" : "Sign In";
+  syncNowButton.hidden = !signedIn;
+  signOutButton.hidden = !signedIn;
+  syncNowButton.disabled = !signedIn || cloudSyncing;
+  signOutButton.disabled = cloudSyncing;
+  signInButton.disabled = !configured || cloudSyncing;
+  signUpButton.disabled = !configured || cloudSyncing;
 }
 
 function loadState() {
@@ -280,8 +435,66 @@ function migrateWeeksToDateChecks(tasks, weeks) {
   return dateChecks;
 }
 
-function saveState() {
+function buildNormalizedStateSnapshot(source = state) {
+  if (!source) {
+    return cloneSeedState();
+  }
+  return normalizeState(JSON.parse(JSON.stringify(source)));
+}
+
+function buildNormalizedPresetSnapshot(source = loadPresets()) {
+  return source.map((preset) => ({
+    ...preset,
+    state: buildNormalizedStateSnapshot(preset.state),
+  }));
+}
+
+function buildCloudDocument() {
+  syncEditableState();
+  return {
+    user_id: cloudUser?.id || null,
+    board_state: buildNormalizedStateSnapshot(state),
+    preserved_boards: buildNormalizedPresetSnapshot(),
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function serializeCloudDocument(document) {
+  return JSON.stringify({
+    board_state: buildNormalizedStateSnapshot(document.board_state || cloneSeedState()),
+    preserved_boards: buildNormalizedPresetSnapshot(document.preserved_boards || []),
+  });
+}
+
+function hasMeaningfulLocalData() {
+  return serializeCloudDocument(buildCloudDocument()) !== serializeCloudDocument({
+    board_state: cloneSeedState(),
+    preserved_boards: [],
+  });
+}
+
+function queueCloudSync(options = {}) {
+  const { immediate = false, showMessage = false } = options;
+  if (hydratingFromCloud || !supabaseClient || !cloudUser) return;
+
+  cloudSyncPending = true;
+  renderCloudState();
+  clearTimeout(cloudSyncTimer);
+  if (immediate) {
+    syncCloudNow({ showMessage }).catch(handleCloudError);
+    return;
+  }
+
+  cloudSyncTimer = window.setTimeout(() => {
+    syncCloudNow({ showMessage: false }).catch(handleCloudError);
+  }, 900);
+}
+
+function saveState(options = {}) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if (options.queueCloud !== false) {
+    queueCloudSync();
+  }
 }
 
 function loadPresets() {
@@ -298,8 +511,327 @@ function loadPresets() {
   }
 }
 
-function savePresets(presets) {
+function savePresets(presets, options = {}) {
   localStorage.setItem(PRESET_KEY, JSON.stringify(presets));
+  if (options.queueCloud !== false) {
+    queueCloudSync();
+  }
+}
+
+function handleCloudError(error) {
+  console.error(error);
+  cloudSyncPending = false;
+  cloudSyncing = false;
+  renderCloudState();
+  setCloudFeedback(error?.message || "Cloud sync failed.", "error");
+}
+
+async function loadSupabaseModule() {
+  if (!supabaseModulePromise) {
+    supabaseModulePromise = import(SUPABASE_MODULE_URL);
+  }
+  return supabaseModulePromise;
+}
+
+async function ensureSupabaseClient() {
+  const config = getCloudConfig();
+  if (!hasCloudConfig(config)) {
+    supabaseClient = null;
+    activeCloudConfigSignature = "";
+    cloudSession = null;
+    cloudUser = null;
+    loadedCloudUserId = "";
+    renderCloudState();
+    return null;
+  }
+
+  const nextSignature = getCloudConfigSignature(config);
+  if (supabaseClient && activeCloudConfigSignature === nextSignature) {
+    return supabaseClient;
+  }
+
+  if (cloudSubscription?.unsubscribe) {
+    cloudSubscription.unsubscribe();
+  }
+
+  const { createClient } = await loadSupabaseModule();
+  supabaseClient = createClient(config.url, config.anonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  });
+  activeCloudConfigSignature = nextSignature;
+
+  const { data: sessionData, error: sessionError } = await supabaseClient.auth.getSession();
+  if (sessionError) {
+    throw sessionError;
+  }
+
+  cloudSession = sessionData.session;
+  cloudUser = sessionData.session?.user || null;
+  const { data: authData } = supabaseClient.auth.onAuthStateChange((event, session) => {
+    window.setTimeout(() => {
+      handleAuthStateChange(event, session).catch(handleCloudError);
+    }, 0);
+  });
+  cloudSubscription = authData.subscription;
+  renderCloudState();
+
+  if (cloudUser) {
+    await hydrateFromCloud();
+  }
+
+  return supabaseClient;
+}
+
+function getAuthRedirectUrl() {
+  return `${window.location.origin}${window.location.pathname}`;
+}
+
+async function fetchCloudRow() {
+  if (!supabaseClient || !cloudUser) return null;
+
+  const { data, error } = await supabaseClient
+    .from(CLOUD_TABLE)
+    .select("user_id, board_state, preserved_boards, updated_at")
+    .eq("user_id", cloudUser.id)
+    .limit(1);
+
+  if (error) {
+    throw error;
+  }
+
+  return data?.[0] || null;
+}
+
+function applyCloudRow(row) {
+  const nextState = row?.board_state ? buildNormalizedStateSnapshot(row.board_state) : cloneSeedState();
+  const nextPresets = row?.preserved_boards ? buildNormalizedPresetSnapshot(row.preserved_boards) : [];
+
+  hydratingFromCloud = true;
+  state = nextState;
+  saveState({ queueCloud: false });
+  savePresets(nextPresets, { queueCloud: false });
+  document.querySelector("#heroText").textContent = state.heroText || seedState.heroText;
+  document.querySelector("#brandText").textContent = state.brandText || seedState.brandText;
+  document.querySelector("#boardTitle").textContent = state.boardTitle || seedState.boardTitle;
+  selectedPresetId = nextPresets[0]?.id || "";
+  hydratingFromCloud = false;
+  render();
+}
+
+async function syncCloudNow(options = {}) {
+  const { showMessage = false } = options;
+  if (!supabaseClient || !cloudUser) return;
+
+  clearTimeout(cloudSyncTimer);
+  cloudSyncTimer = null;
+  cloudSyncPending = false;
+  cloudSyncing = true;
+  renderCloudState();
+  if (showMessage) {
+    setCloudFeedback("Saving to the cloud...", "");
+  }
+
+  const payload = buildCloudDocument();
+  const { data, error } = await supabaseClient
+    .from(CLOUD_TABLE)
+    .upsert(payload, { onConflict: "user_id" })
+    .select("updated_at")
+    .limit(1);
+
+  cloudSyncing = false;
+  if (error) {
+    renderCloudState();
+    throw error;
+  }
+
+  loadedCloudUserId = cloudUser.id;
+  lastCloudSyncAt = data?.[0]?.updated_at || payload.updated_at;
+  renderCloudState();
+  if (showMessage) {
+    setCloudFeedback("Saved to your cloud account.", "success");
+  }
+}
+
+async function hydrateFromCloud() {
+  if (!supabaseClient || !cloudUser) return;
+  if (loadedCloudUserId === cloudUser.id) {
+    renderCloudState();
+    return;
+  }
+
+  const remoteRow = await fetchCloudRow();
+  const localSnapshot = buildCloudDocument();
+  const localMeaningful = hasMeaningfulLocalData();
+
+  if (!remoteRow) {
+    loadedCloudUserId = cloudUser.id;
+    await syncCloudNow({ showMessage: true });
+    return;
+  }
+
+  const remoteSnapshotText = serializeCloudDocument(remoteRow);
+  const localSnapshotText = serializeCloudDocument(localSnapshot);
+  const shouldPrompt = localMeaningful && remoteSnapshotText !== localSnapshotText;
+
+  if (shouldPrompt) {
+    const useRemote = window.confirm("このアカウントには既存のクラウドデータがあります。OKでクラウドを読み込み、キャンセルでこの端末の内容をクラウドへ上書きします。");
+    if (!useRemote) {
+      loadedCloudUserId = cloudUser.id;
+      await syncCloudNow({ showMessage: true });
+      setCloudFeedback("This device's board is now the cloud version.", "success");
+      return;
+    }
+  }
+
+  applyCloudRow(remoteRow);
+  loadedCloudUserId = cloudUser.id;
+  lastCloudSyncAt = remoteRow.updated_at || "";
+  renderCloudState();
+  setCloudFeedback("Cloud board loaded.", "success");
+}
+
+async function handleAuthStateChange(event, session) {
+  cloudSession = session;
+  cloudUser = session?.user || null;
+  if (!cloudUser) {
+    loadedCloudUserId = "";
+    cloudSyncPending = false;
+    cloudSyncing = false;
+    lastCloudSyncAt = "";
+    renderCloudState();
+    if (event === "SIGNED_OUT") {
+      setCloudFeedback("Signed out. The local copy stays on this device.", "success");
+    }
+    return;
+  }
+
+  if (event === "TOKEN_REFRESHED") {
+    renderCloudState();
+    return;
+  }
+
+  if (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "USER_UPDATED") {
+    loadedCloudUserId = "";
+    renderCloudState();
+    await hydrateFromCloud();
+  }
+}
+
+async function saveCloudSetup() {
+  const url = supabaseUrlInput.value.trim();
+  const anonKey = supabaseAnonKeyInput.value.trim();
+
+  if (!url || !anonKey) {
+    setCloudFeedback("Project URL and key are both required.", "error");
+    return;
+  }
+
+  saveCloudConfig({ url, anonKey });
+  supabaseClient = null;
+  activeCloudConfigSignature = "";
+  loadedCloudUserId = "";
+  await ensureSupabaseClient();
+  renderCloudState();
+  setCloudFeedback("Cloud setup saved. You can create an account now.", "success");
+}
+
+async function clearCloudSetup() {
+  if (cloudUser && supabaseClient) {
+    await supabaseClient.auth.signOut();
+  }
+
+  if (cloudSubscription?.unsubscribe) {
+    cloudSubscription.unsubscribe();
+  }
+
+  clearCloudConfig();
+  supabaseClient = null;
+  activeCloudConfigSignature = "";
+  cloudSubscription = null;
+  cloudSession = null;
+  cloudUser = null;
+  cloudSyncPending = false;
+  cloudSyncing = false;
+  lastCloudSyncAt = "";
+  loadedCloudUserId = "";
+  fillCloudConfigFields();
+  renderCloudState();
+  setCloudFeedback("Cloud setup cleared. Local storage is still intact.", "success");
+}
+
+function getAuthCredentials() {
+  return {
+    email: authEmailInput.value.trim(),
+    password: authPasswordInput.value,
+  };
+}
+
+async function signUpWithEmail() {
+  const client = await ensureSupabaseClient();
+  if (!client) {
+    openCloudModal();
+    setCloudFeedback("Add your cloud setup first.", "error");
+    return;
+  }
+
+  const { email, password } = getAuthCredentials();
+  if (!email || !password) {
+    setCloudFeedback("Email and password are required.", "error");
+    return;
+  }
+
+  const { error } = await client.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: getAuthRedirectUrl(),
+    },
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  setCloudFeedback("Account created. If Supabase email confirmation is on, finish it from your inbox.", "success");
+}
+
+async function signInWithEmail() {
+  const client = await ensureSupabaseClient();
+  if (!client) {
+    openCloudModal();
+    setCloudFeedback("Add your cloud setup first.", "error");
+    return;
+  }
+
+  const { email, password } = getAuthCredentials();
+  if (!email || !password) {
+    setCloudFeedback("Email and password are required.", "error");
+    return;
+  }
+
+  const { error } = await client.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  closeCloudModal();
+  setCloudFeedback("Signed in. Checking your cloud board...", "success");
+}
+
+async function signOutFromCloud() {
+  if (!supabaseClient) return;
+  const { error } = await supabaseClient.auth.signOut();
+  if (error) {
+    throw error;
+  }
 }
 
 function syncEditableState() {
@@ -1038,13 +1570,45 @@ input.addEventListener("keydown", (event) => {
 });
 
 window.addEventListener("resize", applyResponsiveLayout);
+cloudSetupButton.addEventListener("click", openCloudModal);
+authOpenButton.addEventListener("click", openCloudModal);
+cloudModalBackdrop.addEventListener("click", closeCloudModal);
+cloudModalCloseButton.addEventListener("click", closeCloudModal);
+saveCloudConfigButton.addEventListener("click", () => {
+  saveCloudSetup().catch(handleCloudError);
+});
+clearCloudConfigButton.addEventListener("click", () => {
+  clearCloudSetup().catch(handleCloudError);
+});
+signInButton.addEventListener("click", () => {
+  signInWithEmail().catch(handleCloudError);
+});
+signUpButton.addEventListener("click", () => {
+  signUpWithEmail().catch(handleCloudError);
+});
+syncNowButton.addEventListener("click", () => {
+  queueCloudSync({ immediate: true, showMessage: true });
+});
+signOutButton.addEventListener("click", () => {
+  signOutFromCloud().catch(handleCloudError);
+});
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !cloudModal.hidden) {
+    closeCloudModal();
+  }
+});
 
 resetButton.addEventListener("click", () => {
   const confirmed = window.confirm("現在のボードを初期状態に戻しますか？Preserveした保存版は残ります。");
   if (!confirmed) return;
 
-  localStorage.removeItem(STORAGE_KEY);
-  window.location.reload();
+  state = cloneSeedState();
+  saveState({ queueCloud: false });
+  document.querySelector("#heroText").textContent = state.heroText || seedState.heroText;
+  document.querySelector("#brandText").textContent = state.brandText || seedState.brandText;
+  document.querySelector("#boardTitle").textContent = state.boardTitle || seedState.boardTitle;
+  render();
+  queueCloudSync({ immediate: true, showMessage: true });
 });
 
 document.querySelector("#currentDate").textContent = new Intl.DateTimeFormat("en", {
@@ -1055,3 +1619,6 @@ document.querySelector("#currentDate").textContent = new Intl.DateTimeFormat("en
 applyResponsiveLayout();
 renderSidebarState();
 render();
+fillCloudConfigFields();
+renderCloudState();
+ensureSupabaseClient().catch(handleCloudError);

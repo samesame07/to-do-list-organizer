@@ -773,9 +773,10 @@ function getAuthCredentials() {
 
 function renderPasswordVisibility() {
   const isVisible = authPasswordInput.type === "text";
-  authPasswordToggle.textContent = isVisible ? "Hide" : "Show";
+  authPasswordToggle.classList.toggle("is-visible", isVisible);
   authPasswordToggle.setAttribute("aria-label", isVisible ? "Hide password" : "Show password");
   authPasswordToggle.setAttribute("aria-pressed", String(isVisible));
+  authPasswordToggle.title = isVisible ? "Hide password" : "Show password";
 }
 
 async function signUpWithEmail() {

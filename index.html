@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Organize Labs Todo</title>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=20260514b" />
   </head>
   <body>
     <main class="app-shell">
@@ -210,13 +210,19 @@
               <input id="authEmailInput" type="email" placeholder="you@example.com" autocomplete="email" />
             </label>
 
-            <label class="cloud-field" for="authPasswordInput">
-              <span>Password</span>
+            <div class="cloud-field">
+              <label class="cloud-field-label" for="authPasswordInput">Password</label>
               <div class="cloud-password-row">
                 <input id="authPasswordInput" type="password" placeholder="At least 6 characters" minlength="6" autocomplete="current-password" />
-                <button class="cloud-password-toggle" id="authPasswordToggle" type="button" aria-label="Show password" aria-pressed="false">Show</button>
+                <button class="cloud-password-toggle" id="authPasswordToggle" type="button" aria-label="Show password" aria-pressed="false" title="Show password">
+                  <svg class="cloud-password-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path class="eye-outline" d="M2.7 12c1.9-3.3 5.3-5.4 9.3-5.4S19.4 8.7 21.3 12c-1.9 3.3-5.3 5.4-9.3 5.4S4.6 15.3 2.7 12Z"></path>
+                    <circle class="eye-pupil" cx="12" cy="12" r="2.8"></circle>
+                    <path class="eye-slash" d="M4 20 20 4"></path>
+                  </svg>
+                </button>
               </div>
-            </label>
+            </div>
 
             <div class="cloud-panel-actions">
               <button class="cloud-primary" id="signInButton" type="button">Sign In</button>
@@ -231,7 +237,7 @@
       </div>
     </section>
 
-    <script src="cloud-config.js"></script>
-    <script src="script.js"></script>
+    <script src="cloud-config.js?v=20260514b"></script>
+    <script src="script.js?v=20260514b"></script>
   </body>
 </html>

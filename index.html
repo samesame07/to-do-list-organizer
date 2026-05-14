@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Organize Labs Todo</title>
-    <link rel="stylesheet" href="styles.css?v=20260514b" />
+    <link rel="stylesheet" href="styles.css?v=20260514c" />
   </head>
   <body>
     <main class="app-shell">
@@ -23,7 +23,6 @@
             <span id="cloudStatusDetail">Sign in to keep your board on the cloud.</span>
           </div>
           <div class="cloud-strip-actions">
-            <button class="cloud-pill" id="cloudSetupButton" type="button">Cloud Setup</button>
             <button class="cloud-pill" id="authOpenButton" type="button">Sign In</button>
             <button class="cloud-pill" id="syncNowButton" type="button" hidden>Sync Now</button>
             <button class="cloud-pill" id="signOutButton" type="button" hidden>Sign Out</button>
@@ -180,30 +179,10 @@
           <button class="cloud-modal-close" id="cloudModalCloseButton" type="button">Close</button>
         </header>
 
-        <div class="cloud-modal-grid">
-          <section class="cloud-panel">
-            <h3>Cloud Setup</h3>
-            <p>Paste your Supabase project URL and public key once.</p>
-
-            <label class="cloud-field" for="supabaseUrlInput">
-              <span>Project URL</span>
-              <input id="supabaseUrlInput" type="url" placeholder="https://your-project.supabase.co" />
-            </label>
-
-            <label class="cloud-field" for="supabaseAnonKeyInput">
-              <span>Publishable / anon key</span>
-              <textarea id="supabaseAnonKeyInput" rows="5" placeholder="sb_publishable_... or eyJ..."></textarea>
-            </label>
-
-            <div class="cloud-panel-actions">
-              <button class="cloud-primary" id="saveCloudConfigButton" type="button">Save Setup</button>
-              <button class="cloud-secondary" id="clearCloudConfigButton" type="button">Clear</button>
-            </div>
-          </section>
-
+        <div class="cloud-modal-grid is-single">
           <section class="cloud-panel">
             <h3>Account</h3>
-            <p id="authPanelStatus">Cloud setup required before sign in.</p>
+            <p id="authPanelStatus">Create an account or sign in with your email.</p>
 
             <label class="cloud-field" for="authEmailInput">
               <span>Email</span>
@@ -237,7 +216,7 @@
       </div>
     </section>
 
-    <script src="cloud-config.js?v=20260514b"></script>
-    <script src="script.js?v=20260514b"></script>
+    <script src="cloud-config.js?v=20260514c"></script>
+    <script src="script.js?v=20260514c"></script>
   </body>
 </html>

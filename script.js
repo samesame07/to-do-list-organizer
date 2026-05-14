@@ -142,17 +142,12 @@ const mobileActionsHost = document.querySelector("#mobileActionsHost");
 const mobileSidebarHost = document.querySelector("#mobileSidebarHost");
 const cloudStatusLabel = document.querySelector("#cloudStatusLabel");
 const cloudStatusDetail = document.querySelector("#cloudStatusDetail");
-const cloudSetupButton = document.querySelector("#cloudSetupButton");
 const authOpenButton = document.querySelector("#authOpenButton");
 const syncNowButton = document.querySelector("#syncNowButton");
 const signOutButton = document.querySelector("#signOutButton");
 const cloudModal = document.querySelector("#cloudModal");
 const cloudModalBackdrop = document.querySelector("#cloudModalBackdrop");
 const cloudModalCloseButton = document.querySelector("#cloudModalCloseButton");
-const supabaseUrlInput = document.querySelector("#supabaseUrlInput");
-const supabaseAnonKeyInput = document.querySelector("#supabaseAnonKeyInput");
-const saveCloudConfigButton = document.querySelector("#saveCloudConfigButton");
-const clearCloudConfigButton = document.querySelector("#clearCloudConfigButton");
 const authPanelStatus = document.querySelector("#authPanelStatus");
 const authEmailInput = document.querySelector("#authEmailInput");
 const authPasswordInput = document.querySelector("#authPasswordInput");
@@ -265,7 +260,6 @@ function getCloudConfigSignature(config = getCloudConfig()) {
 }
 
 function openCloudModal() {
-  fillCloudConfigFields();
   cloudModal.hidden = false;
   cloudModal.setAttribute("aria-hidden", "false");
 }
@@ -273,12 +267,6 @@ function openCloudModal() {
 function closeCloudModal() {
   cloudModal.hidden = true;
   cloudModal.setAttribute("aria-hidden", "true");
-}
-
-function fillCloudConfigFields() {
-  const config = getCloudConfig();
-  supabaseUrlInput.value = config.url;
-  supabaseAnonKeyInput.value = config.anonKey;
 }
 
 function setCloudFeedback(message = "", tone = "") {
@@ -304,9 +292,9 @@ function renderCloudState() {
   const signedIn = Boolean(cloudUser);
 
   if (!configured) {
-    cloudStatusLabel.textContent = "Local only";
-    cloudStatusDetail.textContent = "Add your Supabase project to keep this board across devices.";
-    authPanelStatus.textContent = "Cloud setup required before sign in.";
+    cloudStatusLabel.textContent = "Cloud unavailable";
+    cloudStatusDetail.textContent = "Cloud sign-in is temporarily unavailable for this board.";
+    authPanelStatus.textContent = "Cloud sign-in is temporarily unavailable.";
   } else if (!signedIn) {
     cloudStatusLabel.textContent = "Cloud ready";
     cloudStatusDetail.textContent = "Create an account or sign in to sync this board.";
@@ -722,48 +710,6 @@ async function handleAuthStateChange(event, session) {
   }
 }
 
-async function saveCloudSetup() {
-  const url = supabaseUrlInput.value.trim();
-  const anonKey = supabaseAnonKeyInput.value.trim();
-
-  if (!url || !anonKey) {
-    setCloudFeedback("Project URL and key are both required.", "error");
-    return;
-  }
-
-  saveCloudConfig({ url, anonKey });
-  supabaseClient = null;
-  activeCloudConfigSignature = "";
-  loadedCloudUserId = "";
-  await ensureSupabaseClient();
-  renderCloudState();
-  setCloudFeedback("Cloud setup saved. You can create an account now.", "success");
-}
-
-async function clearCloudSetup() {
-  if (cloudUser && supabaseClient) {
-    await supabaseClient.auth.signOut();
-  }
-
-  if (cloudSubscription?.unsubscribe) {
-    cloudSubscription.unsubscribe();
-  }
-
-  clearCloudConfig();
-  supabaseClient = null;
-  activeCloudConfigSignature = "";
-  cloudSubscription = null;
-  cloudSession = null;
-  cloudUser = null;
-  cloudSyncPending = false;
-  cloudSyncing = false;
-  lastCloudSyncAt = "";
-  loadedCloudUserId = "";
-  fillCloudConfigFields();
-  renderCloudState();
-  setCloudFeedback("Cloud setup cleared. Local storage is still intact.", "success");
-}
-
 function getAuthCredentials() {
   return {
     email: authEmailInput.value.trim(),
@@ -782,8 +728,7 @@ function renderPasswordVisibility() {
 async function signUpWithEmail() {
   const client = await ensureSupabaseClient();
   if (!client) {
-    openCloudModal();
-    setCloudFeedback("Add your cloud setup first.", "error");
+    setCloudFeedback("Cloud sign-in is temporarily unavailable.", "error");
     return;
   }
 
@@ -811,8 +756,7 @@ async function signUpWithEmail() {
 async function signInWithEmail() {
   const client = await ensureSupabaseClient();
   if (!client) {
-    openCloudModal();
-    setCloudFeedback("Add your cloud setup first.", "error");
+    setCloudFeedback("Cloud sign-in is temporarily unavailable.", "error");
     return;
   }
 
@@ -1579,16 +1523,9 @@ input.addEventListener("keydown", (event) => {
 });
 
 window.addEventListener("resize", applyResponsiveLayout);
-cloudSetupButton.addEventListener("click", openCloudModal);
 authOpenButton.addEventListener("click", openCloudModal);
 cloudModalBackdrop.addEventListener("click", closeCloudModal);
 cloudModalCloseButton.addEventListener("click", closeCloudModal);
-saveCloudConfigButton.addEventListener("click", () => {
-  saveCloudSetup().catch(handleCloudError);
-});
-clearCloudConfigButton.addEventListener("click", () => {
-  clearCloudSetup().catch(handleCloudError);
-});
 signInButton.addEventListener("click", () => {
   signInWithEmail().catch(handleCloudError);
 });
@@ -1632,7 +1569,6 @@ document.querySelector("#currentDate").textContent = new Intl.DateTimeFormat("en
 applyResponsiveLayout();
 renderSidebarState();
 render();
-fillCloudConfigFields();
 renderCloudState();
 renderPasswordVisibility();
 ensureSupabaseClient().catch(handleCloudError);

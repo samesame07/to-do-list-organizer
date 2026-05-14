@@ -306,6 +306,10 @@ textarea {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.cloud-modal-grid.is-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .cloud-panel {
   padding: 18px;
 }

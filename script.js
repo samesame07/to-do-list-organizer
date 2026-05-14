@@ -155,6 +155,9 @@ const authPasswordToggle = document.querySelector("#authPasswordToggle");
 const signInButton = document.querySelector("#signInButton");
 const signUpButton = document.querySelector("#signUpButton");
 const cloudFeedback = document.querySelector("#cloudFeedback");
+const heroTextElement = document.querySelector("#heroText");
+const brandTextElement = document.querySelector("#brandText");
+const boardTitleElement = document.querySelector("#boardTitle");
 let selectedPresetId = "";
 let supabaseClient = null;
 let supabaseModulePromise = null;
@@ -603,9 +606,11 @@ function applyCloudRow(row) {
   state = nextState;
   saveState({ queueCloud: false });
   savePresets(nextPresets, { queueCloud: false });
-  document.querySelector("#heroText").textContent = state.heroText || seedState.heroText;
-  document.querySelector("#brandText").textContent = state.brandText || seedState.brandText;
-  document.querySelector("#boardTitle").textContent = state.boardTitle || seedState.boardTitle;
+  heroTextElement.textContent = state.heroText || seedState.heroText;
+  if (brandTextElement) {
+    brandTextElement.textContent = state.brandText || seedState.brandText;
+  }
+  boardTitleElement.textContent = state.boardTitle || seedState.boardTitle;
   selectedPresetId = nextPresets[0]?.id || "";
   hydratingFromCloud = false;
   render();
@@ -788,9 +793,11 @@ async function signOutFromCloud() {
 }
 
 function syncEditableState() {
-  state.heroText = document.querySelector("#heroText").textContent.trim() || seedState.heroText;
-  state.brandText = document.querySelector("#brandText").textContent.trim() || seedState.brandText;
-  state.boardTitle = document.querySelector("#boardTitle").textContent.trim() || seedState.boardTitle;
+  state.heroText = heroTextElement.textContent.trim() || seedState.heroText;
+  if (brandTextElement) {
+    state.brandText = brandTextElement.textContent.trim() || seedState.brandText;
+  }
+  state.boardTitle = boardTitleElement.textContent.trim() || seedState.boardTitle;
 }
 
 function bindEditable(element, key, fallback) {
@@ -1479,15 +1486,19 @@ function loadSelectedPreset() {
   state = JSON.parse(JSON.stringify(preset.state));
   state = normalizeState(state);
   saveState();
-  document.querySelector("#heroText").textContent = state.heroText || seedState.heroText;
-  document.querySelector("#brandText").textContent = state.brandText || seedState.brandText;
-  document.querySelector("#boardTitle").textContent = state.boardTitle || seedState.boardTitle;
+  heroTextElement.textContent = state.heroText || seedState.heroText;
+  if (brandTextElement) {
+    brandTextElement.textContent = state.brandText || seedState.brandText;
+  }
+  boardTitleElement.textContent = state.boardTitle || seedState.boardTitle;
   render();
 }
 
-bindEditable(document.querySelector("#heroText"), "heroText", seedState.heroText);
-bindEditable(document.querySelector("#brandText"), "brandText", seedState.brandText);
-bindEditable(document.querySelector("#boardTitle"), "boardTitle", seedState.boardTitle);
+bindEditable(heroTextElement, "heroText", seedState.heroText);
+if (brandTextElement) {
+  bindEditable(brandTextElement, "brandText", seedState.brandText);
+}
+bindEditable(boardTitleElement, "boardTitle", seedState.boardTitle);
 
 addButton.addEventListener("click", addTask);
 sidebarToggle.addEventListener("click", () => {
@@ -1554,9 +1565,11 @@ resetButton.addEventListener("click", () => {
 
   state = cloneSeedState();
   saveState({ queueCloud: false });
-  document.querySelector("#heroText").textContent = state.heroText || seedState.heroText;
-  document.querySelector("#brandText").textContent = state.brandText || seedState.brandText;
-  document.querySelector("#boardTitle").textContent = state.boardTitle || seedState.boardTitle;
+  heroTextElement.textContent = state.heroText || seedState.heroText;
+  if (brandTextElement) {
+    brandTextElement.textContent = state.brandText || seedState.brandText;
+  }
+  boardTitleElement.textContent = state.boardTitle || seedState.boardTitle;
   render();
   queueCloudSync({ immediate: true, showMessage: true });
 });

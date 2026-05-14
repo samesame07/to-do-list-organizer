@@ -156,6 +156,7 @@ const clearCloudConfigButton = document.querySelector("#clearCloudConfigButton")
 const authPanelStatus = document.querySelector("#authPanelStatus");
 const authEmailInput = document.querySelector("#authEmailInput");
 const authPasswordInput = document.querySelector("#authPasswordInput");
+const authPasswordToggle = document.querySelector("#authPasswordToggle");
 const signInButton = document.querySelector("#signInButton");
 const signUpButton = document.querySelector("#signUpButton");
 const cloudFeedback = document.querySelector("#cloudFeedback");
@@ -768,6 +769,13 @@ function getAuthCredentials() {
     email: authEmailInput.value.trim(),
     password: authPasswordInput.value,
   };
+}
+
+function renderPasswordVisibility() {
+  const isVisible = authPasswordInput.type === "text";
+  authPasswordToggle.textContent = isVisible ? "Hide" : "Show";
+  authPasswordToggle.setAttribute("aria-label", isVisible ? "Hide password" : "Show password");
+  authPasswordToggle.setAttribute("aria-pressed", String(isVisible));
 }
 
 async function signUpWithEmail() {
@@ -1586,6 +1594,10 @@ signInButton.addEventListener("click", () => {
 signUpButton.addEventListener("click", () => {
   signUpWithEmail().catch(handleCloudError);
 });
+authPasswordToggle.addEventListener("click", () => {
+  authPasswordInput.type = authPasswordInput.type === "password" ? "text" : "password";
+  renderPasswordVisibility();
+});
 syncNowButton.addEventListener("click", () => {
   queueCloudSync({ immediate: true, showMessage: true });
 });
@@ -1621,4 +1633,5 @@ renderSidebarState();
 render();
 fillCloudConfigFields();
 renderCloudState();
+renderPasswordVisibility();
 ensureSupabaseClient().catch(handleCloudError);

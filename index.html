@@ -212,7 +212,10 @@
 
             <label class="cloud-field" for="authPasswordInput">
               <span>Password</span>
-              <input id="authPasswordInput" type="password" placeholder="At least 6 characters" minlength="6" autocomplete="current-password" />
+              <div class="cloud-password-row">
+                <input id="authPasswordInput" type="password" placeholder="At least 6 characters" minlength="6" autocomplete="current-password" />
+                <button class="cloud-password-toggle" id="authPasswordToggle" type="button" aria-label="Show password" aria-pressed="false">Show</button>
+              </div>
             </label>
 
             <div class="cloud-panel-actions">

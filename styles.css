@@ -352,6 +352,25 @@ textarea {
   resize: vertical;
 }
 
+.cloud-password-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.cloud-password-row input {
+  min-width: 0;
+}
+
+.cloud-password-toggle {
+  border: 1px solid #cfd5de;
+  border-left: 0;
+  background: #f7f8fa;
+  color: #44505e;
+  min-width: 76px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
 .cloud-panel-actions {
   display: flex;
   flex-wrap: wrap;

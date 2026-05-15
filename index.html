@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Organize Labs Todo</title>
-    <link rel="stylesheet" href="styles.css?v=20260514d" />
+    <link rel="stylesheet" href="styles.css?v=20260515a" />
   </head>
   <body>
     <main class="app-shell">
@@ -19,6 +19,7 @@
             <span id="cloudStatusDetail">Sign in to keep your board on the cloud.</span>
           </div>
           <div class="cloud-strip-actions">
+            <button class="cloud-pill" id="sharedPageButton" type="button">Shared</button>
             <button class="cloud-pill" id="authOpenButton" type="button">Sign In</button>
             <button class="cloud-pill" id="syncNowButton" type="button" hidden>Sync Now</button>
             <button class="cloud-pill" id="signOutButton" type="button" hidden>Sign Out</button>
@@ -159,6 +160,126 @@
 
               <div class="review-detail-grid" id="reviewDetailGrid"></div>
             </section>
+
+            <section class="shared-page" id="sharedPage" hidden>
+              <header class="shared-page-head">
+                <button class="back-button" id="backFromSharedButton" type="button">Back</button>
+                <div>
+                  <span>Private Sharing</span>
+                  <h1>Shared Progress</h1>
+                </div>
+              </header>
+
+              <div class="shared-page-grid">
+                <aside class="shared-sidebar">
+                  <section class="shared-card">
+                    <div class="shared-card-head">
+                      <h2>Invite a Friend</h2>
+                      <span>Private</span>
+                    </div>
+                    <p>Send a private invite by email so you can see each other's board.</p>
+                    <div class="shared-invite-row">
+                      <input id="friendInviteEmailInput" type="email" placeholder="friend@example.com" autocomplete="email" />
+                      <button class="cloud-primary" id="sendFriendInviteButton" type="button">Invite</button>
+                    </div>
+                    <p class="shared-feedback" id="sharedInviteFeedback"></p>
+                  </section>
+
+                  <section class="shared-card">
+                    <div class="shared-card-head">
+                      <h2>Friends</h2>
+                      <span id="friendsCountBadge">0</span>
+                    </div>
+                    <div class="shared-list" id="friendsList"></div>
+                  </section>
+
+                  <section class="shared-card">
+                    <div class="shared-card-head">
+                      <h2>Incoming</h2>
+                      <span id="incomingCountBadge">0</span>
+                    </div>
+                    <div class="shared-list" id="incomingRequestsList"></div>
+                  </section>
+
+                  <section class="shared-card">
+                    <div class="shared-card-head">
+                      <h2>Outgoing</h2>
+                      <span id="outgoingCountBadge">0</span>
+                    </div>
+                    <div class="shared-list" id="outgoingRequestsList"></div>
+                  </section>
+                </aside>
+
+                <div class="shared-main">
+                  <section class="shared-card" id="sharedPageStatusCard">
+                    <div class="shared-card-head">
+                      <h2>Shared Space</h2>
+                      <span id="sharedPageStatusTag">Sign in</span>
+                    </div>
+                    <p id="sharedPageStatusText">Sign in to start sharing your board with close friends.</p>
+                  </section>
+
+                  <section class="shared-card shared-composer">
+                    <div class="shared-card-head">
+                      <h2>Share a Win</h2>
+                      <span>Visible to friends</span>
+                    </div>
+                    <textarea id="sharedNoteInput" rows="4" maxlength="280" placeholder="What did you get done today?"></textarea>
+                    <div class="shared-note-actions">
+                      <p class="shared-feedback" id="sharedNoteFeedback"></p>
+                      <button class="cloud-primary" id="postSharedNoteButton" type="button">Post Note</button>
+                    </div>
+                  </section>
+
+                  <section class="shared-card shared-empty-state" id="sharedEmptyState">
+                    <h2>No friend selected yet</h2>
+                    <p>Invite someone or accept a request, then their board and notes will show up here.</p>
+                  </section>
+
+                  <section class="shared-detail" id="sharedDetail" hidden>
+                    <div class="shared-card shared-detail-head">
+                      <div>
+                        <span id="sharedFriendMeta">Connected friend</span>
+                        <h2 id="sharedFriendName">Friend</h2>
+                        <p id="sharedFriendStatus">Waiting for updates.</p>
+                      </div>
+                      <div class="shared-view-tabs" aria-label="Shared view type">
+                        <button class="is-active" id="sharedBoardTabButton" type="button">Board</button>
+                        <button id="sharedReviewTabButton" type="button">Review</button>
+                        <button id="sharedNotesTabButton" type="button">Notes</button>
+                      </div>
+                    </div>
+
+                    <div class="shared-hero-stats" id="sharedHeroStats"></div>
+
+                    <section class="shared-card shared-board-pane" id="sharedBoardPane">
+                      <div class="sheet-heading">
+                        <span>Friend board</span>
+                        <span id="sharedBoardDateLabel"></span>
+                      </div>
+                      <div class="shared-board-shell" id="sharedBoardPreview"></div>
+                    </section>
+
+                    <section class="shared-card shared-review-pane" id="sharedReviewPane" hidden>
+                      <div class="review-chart-head">
+                        <h2 id="sharedReviewChartTitle">Month progress curve</h2>
+                        <span>0% - 100%</span>
+                      </div>
+                      <svg id="sharedReviewChart" viewBox="0 0 640 220" role="img" aria-label="Shared review chart"></svg>
+                      <div class="review-detail-grid" id="sharedReviewGrid"></div>
+                    </section>
+
+                    <section class="shared-card shared-notes-pane" id="sharedNotesPane" hidden>
+                      <div class="shared-card-head">
+                        <h2>Notes Feed</h2>
+                        <span>Just the two of you</span>
+                      </div>
+                      <div class="shared-notes-feed" id="sharedFriendNotesList"></div>
+                    </section>
+                  </section>
+                </div>
+              </div>
+            </section>
           </div>
         </div>
       </section>
@@ -212,7 +333,7 @@
       </div>
     </section>
 
-    <script src="cloud-config.js?v=20260514d"></script>
-    <script src="script.js?v=20260514d"></script>
+    <script src="cloud-config.js?v=20260515a"></script>
+    <script src="script.js?v=20260515a"></script>
   </body>
 </html>

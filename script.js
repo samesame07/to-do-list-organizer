@@ -2,6 +2,9 @@ const STORAGE_KEY = "organize-labs-todo-custom";
 const PRESET_KEY = "organize-labs-todo-presets";
 const CLOUD_CONFIG_KEY = "organize-labs-todo-cloud-config";
 const CLOUD_TABLE = "user_boards";
+const PROFILE_TABLE = "user_profiles";
+const CONNECTION_TABLE = "friend_connections";
+const NOTE_TABLE = "shared_notes";
 const SUPABASE_MODULE_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 const days = ["M", "T", "W", "T", "F", "S", "S"];
 const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -59,8 +62,7 @@ function getDashboardDates() {
   return getMonthDates(getCurrentMonthKey());
 }
 
-function getVisibleDateGroups() {
-  const dates = getDashboardDates();
+function getDateGroupsFromDates(dates) {
   const groups = [];
   for (let index = 0; index < dates.length; index += 7) {
     groups.push({
@@ -68,6 +70,10 @@ function getVisibleDateGroups() {
     });
   }
   return groups;
+}
+
+function getVisibleDateGroups() {
+  return getDateGroupsFromDates(getDashboardDates());
 }
 
 function getDateGroupTitle(group) {
@@ -142,6 +148,7 @@ const mobileActionsHost = document.querySelector("#mobileActionsHost");
 const mobileSidebarHost = document.querySelector("#mobileSidebarHost");
 const cloudStatusLabel = document.querySelector("#cloudStatusLabel");
 const cloudStatusDetail = document.querySelector("#cloudStatusDetail");
+const sharedPageButton = document.querySelector("#sharedPageButton");
 const authOpenButton = document.querySelector("#authOpenButton");
 const syncNowButton = document.querySelector("#syncNowButton");
 const signOutButton = document.querySelector("#signOutButton");
@@ -158,6 +165,40 @@ const cloudFeedback = document.querySelector("#cloudFeedback");
 const heroTextElement = document.querySelector("#heroText");
 const brandTextElement = document.querySelector("#brandText");
 const boardTitleElement = document.querySelector("#boardTitle");
+const sharedPage = document.querySelector("#sharedPage");
+const backFromSharedButton = document.querySelector("#backFromSharedButton");
+const friendInviteEmailInput = document.querySelector("#friendInviteEmailInput");
+const sendFriendInviteButton = document.querySelector("#sendFriendInviteButton");
+const sharedInviteFeedback = document.querySelector("#sharedInviteFeedback");
+const friendsList = document.querySelector("#friendsList");
+const incomingRequestsList = document.querySelector("#incomingRequestsList");
+const outgoingRequestsList = document.querySelector("#outgoingRequestsList");
+const friendsCountBadge = document.querySelector("#friendsCountBadge");
+const incomingCountBadge = document.querySelector("#incomingCountBadge");
+const outgoingCountBadge = document.querySelector("#outgoingCountBadge");
+const sharedPageStatusTag = document.querySelector("#sharedPageStatusTag");
+const sharedPageStatusText = document.querySelector("#sharedPageStatusText");
+const sharedNoteInput = document.querySelector("#sharedNoteInput");
+const postSharedNoteButton = document.querySelector("#postSharedNoteButton");
+const sharedNoteFeedback = document.querySelector("#sharedNoteFeedback");
+const sharedEmptyState = document.querySelector("#sharedEmptyState");
+const sharedDetail = document.querySelector("#sharedDetail");
+const sharedFriendMeta = document.querySelector("#sharedFriendMeta");
+const sharedFriendName = document.querySelector("#sharedFriendName");
+const sharedFriendStatus = document.querySelector("#sharedFriendStatus");
+const sharedHeroStats = document.querySelector("#sharedHeroStats");
+const sharedBoardDateLabel = document.querySelector("#sharedBoardDateLabel");
+const sharedBoardPreview = document.querySelector("#sharedBoardPreview");
+const sharedReviewChartTitle = document.querySelector("#sharedReviewChartTitle");
+const sharedReviewChart = document.querySelector("#sharedReviewChart");
+const sharedReviewGrid = document.querySelector("#sharedReviewGrid");
+const sharedFriendNotesList = document.querySelector("#sharedFriendNotesList");
+const sharedBoardPane = document.querySelector("#sharedBoardPane");
+const sharedReviewPane = document.querySelector("#sharedReviewPane");
+const sharedNotesPane = document.querySelector("#sharedNotesPane");
+const sharedBoardTabButton = document.querySelector("#sharedBoardTabButton");
+const sharedReviewTabButton = document.querySelector("#sharedReviewTabButton");
+const sharedNotesTabButton = document.querySelector("#sharedNotesTabButton");
 let selectedPresetId = "";
 let supabaseClient = null;
 let supabaseModulePromise = null;
@@ -171,6 +212,13 @@ let cloudSyncing = false;
 let lastCloudSyncAt = "";
 let loadedCloudUserId = "";
 let hydratingFromCloud = false;
+let sharedSchemaReady = true;
+let sharedConnections = [];
+let sharedProfiles = new Map();
+let sharedBoards = new Map();
+let sharedNotes = [];
+let selectedFriendId = "";
+let sharedViewMode = "board";
 
 function getInitialSidebarState() {
   const saved = localStorage.getItem("organize-labs-sidebar-open");
@@ -325,6 +373,330 @@ function renderCloudState() {
   signOutButton.disabled = cloudSyncing;
   signInButton.disabled = !configured || cloudSyncing;
   signUpButton.disabled = !configured || cloudSyncing;
+}
+
+function setSharedInviteStatus(message = "", tone = "") {
+  sharedInviteFeedback.textContent = message;
+  sharedInviteFeedback.className = "shared-feedback";
+  if (tone) {
+    sharedInviteFeedback.classList.add(`is-${tone}`);
+  }
+}
+
+function setSharedNoteStatus(message = "", tone = "") {
+  sharedNoteFeedback.textContent = message;
+  sharedNoteFeedback.className = "shared-feedback";
+  if (tone) {
+    sharedNoteFeedback.classList.add(`is-${tone}`);
+  }
+}
+
+function getCurrentUserEmail() {
+  return cloudUser?.email?.trim().toLowerCase() || "";
+}
+
+function getDefaultDisplayName(email = "") {
+  const [name] = email.split("@");
+  return name || "Friend";
+}
+
+function getProfileDisplayName(profile, fallbackEmail = "") {
+  return profile?.display_name?.trim() || profile?.email || fallbackEmail || "Friend";
+}
+
+function getSharedTimestampLabel(value) {
+  if (!value) return "Just now";
+  return new Intl.DateTimeFormat("ja-JP", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function isMissingSharedSchemaError(error) {
+  const message = String(error?.message || "");
+  return ["friend_connections", "user_profiles", "shared_notes"].some((name) => message.includes(name));
+}
+
+function resetSharedCollections() {
+  sharedConnections = [];
+  sharedProfiles = new Map();
+  sharedBoards = new Map();
+  sharedNotes = [];
+  selectedFriendId = "";
+}
+
+function getFriendIdFromConnection(connection) {
+  if (!cloudUser) return "";
+  return connection.requester_id === cloudUser.id ? connection.invitee_id || "" : connection.requester_id;
+}
+
+function getFriendEmailFromConnection(connection) {
+  if (!cloudUser) return connection.invitee_email || "";
+  if (connection.requester_id === cloudUser.id) {
+    return connection.invitee_email || "";
+  }
+  const friendProfile = sharedProfiles.get(connection.requester_id);
+  return friendProfile?.email || connection.invitee_email || "";
+}
+
+function getAcceptedFriends() {
+  const entries = new Map();
+
+  sharedConnections
+    .filter((connection) => connection.status === "accepted")
+    .forEach((connection) => {
+      const friendId = getFriendIdFromConnection(connection);
+      if (!friendId) return;
+      const profile = sharedProfiles.get(friendId);
+      const board = sharedBoards.get(friendId);
+      const boardState = board?.board_state ? buildNormalizedStateSnapshot(board.board_state) : cloneSeedState();
+
+      entries.set(friendId, {
+        id: friendId,
+        connectionId: connection.id,
+        email: getFriendEmailFromConnection(connection),
+        name: getProfileDisplayName(profile, getFriendEmailFromConnection(connection)),
+        boardState,
+        updatedAt: board?.updated_at || connection.updated_at || connection.accepted_at || connection.created_at,
+      });
+    });
+
+  return [...entries.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function getIncomingRequests() {
+  const currentUserEmail = getCurrentUserEmail();
+  return sharedConnections.filter((connection) => {
+    if (connection.status !== "pending") return false;
+    if (connection.requester_id === cloudUser?.id) return false;
+    return connection.invitee_id === cloudUser?.id || connection.invitee_email === currentUserEmail;
+  });
+}
+
+function getOutgoingRequests() {
+  return sharedConnections.filter((connection) => connection.status === "pending" && connection.requester_id === cloudUser?.id);
+}
+
+async function upsertOwnProfile() {
+  if (!supabaseClient || !cloudUser) return;
+  const email = getCurrentUserEmail();
+  if (!email) return;
+
+  const displayName =
+    cloudUser.user_metadata?.display_name?.trim() ||
+    cloudUser.user_metadata?.full_name?.trim() ||
+    getDefaultDisplayName(email);
+
+  const { error } = await supabaseClient.from(PROFILE_TABLE).upsert(
+    {
+      user_id: cloudUser.id,
+      email,
+      display_name: displayName,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" },
+  );
+
+  if (error) {
+    throw error;
+  }
+}
+
+async function claimPendingFriendConnections() {
+  if (!supabaseClient || !cloudUser) return;
+  const currentUserEmail = getCurrentUserEmail();
+  if (!currentUserEmail) return;
+
+  const { error } = await supabaseClient
+    .from(CONNECTION_TABLE)
+    .update({
+      invitee_id: cloudUser.id,
+      updated_at: new Date().toISOString(),
+    })
+    .is("invitee_id", null)
+    .eq("invitee_email", currentUserEmail);
+
+  if (error) {
+    throw error;
+  }
+}
+
+async function loadSharedData(options = {}) {
+  const { preserveSelection = true } = options;
+
+  if (!supabaseClient || !cloudUser) {
+    resetSharedCollections();
+    renderSharedPage();
+    return;
+  }
+
+  try {
+    await upsertOwnProfile();
+    await claimPendingFriendConnections();
+
+    const { data: connectionsData, error: connectionsError } = await supabaseClient
+      .from(CONNECTION_TABLE)
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (connectionsError) {
+      throw connectionsError;
+    }
+
+    sharedConnections = connectionsData || [];
+
+    const friendIds = [...new Set(getAcceptedFriends().map((friend) => friend.id).filter(Boolean))];
+    const relatedUserIds = [
+      ...new Set(
+        sharedConnections
+          .flatMap((connection) => [connection.requester_id, connection.invitee_id])
+          .filter((id) => id && id !== cloudUser.id),
+      ),
+    ];
+
+    if (relatedUserIds.length || friendIds.length) {
+      const [{ data: profilesData, error: profilesError }, { data: boardsData, error: boardsError }, { data: notesData, error: notesError }] =
+        await Promise.all([
+          supabaseClient.from(PROFILE_TABLE).select("user_id, email, display_name").in("user_id", relatedUserIds),
+          supabaseClient.from(CLOUD_TABLE).select("user_id, board_state, updated_at").in("user_id", friendIds),
+          supabaseClient
+            .from(NOTE_TABLE)
+            .select("id, author_id, body, created_at, updated_at")
+            .in("author_id", [...new Set([cloudUser.id, ...friendIds])])
+            .order("created_at", { ascending: false })
+            .limit(120),
+        ]);
+
+      if (profilesError) throw profilesError;
+      if (boardsError) throw boardsError;
+      if (notesError) throw notesError;
+
+      sharedProfiles = new Map((profilesData || []).map((profile) => [profile.user_id, profile]));
+      sharedBoards = new Map((boardsData || []).map((row) => [row.user_id, row]));
+      sharedNotes = notesData || [];
+    } else {
+      sharedProfiles = new Map();
+      sharedBoards = new Map();
+      sharedNotes = [];
+    }
+
+    sharedSchemaReady = true;
+    const acceptedFriends = getAcceptedFriends();
+    if (!preserveSelection || !acceptedFriends.some((friend) => friend.id === selectedFriendId)) {
+      selectedFriendId = acceptedFriends[0]?.id || "";
+    }
+    renderSharedPage();
+  } catch (error) {
+    if (isMissingSharedSchemaError(error)) {
+      sharedSchemaReady = false;
+      resetSharedCollections();
+      renderSharedPage();
+      setSharedInviteStatus("Supabase SQL を最新に更新すると共有機能が有効になります。", "error");
+      return;
+    }
+    throw error;
+  }
+}
+
+async function sendFriendInvite() {
+  const client = await ensureSupabaseClient();
+  if (!client || !cloudUser) {
+    openCloudModal();
+    setSharedInviteStatus("まずサインインしてください。", "error");
+    return;
+  }
+
+  const inviteEmail = friendInviteEmailInput.value.trim().toLowerCase();
+  if (!inviteEmail) {
+    setSharedInviteStatus("招待したいメールアドレスを入力してください。", "error");
+    return;
+  }
+  if (inviteEmail === getCurrentUserEmail()) {
+    setSharedInviteStatus("自分自身には招待を送れません。", "error");
+    return;
+  }
+
+  const { error } = await client.from(CONNECTION_TABLE).insert({
+    requester_id: cloudUser.id,
+    invitee_email: inviteEmail,
+    updated_at: new Date().toISOString(),
+  });
+
+  if (error) {
+    if (error.code === "23505") {
+      setSharedInviteStatus("その相手にはすでに招待を送っています。", "error");
+      return;
+    }
+    throw error;
+  }
+
+  friendInviteEmailInput.value = "";
+  setSharedInviteStatus("招待を送りました。相手が承認すると友達一覧に出ます。", "success");
+  await loadSharedData();
+}
+
+async function acceptFriendInvite(connectionId) {
+  if (!supabaseClient || !cloudUser) return;
+
+  const { error } = await supabaseClient
+    .from(CONNECTION_TABLE)
+    .update({
+      invitee_id: cloudUser.id,
+      status: "accepted",
+      accepted_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", connectionId);
+
+  if (error) {
+    throw error;
+  }
+
+  setSharedInviteStatus("共有リクエストを承認しました。", "success");
+  await loadSharedData({ preserveSelection: false });
+}
+
+async function removeFriendConnection(connectionId, message) {
+  if (!supabaseClient || !cloudUser) return;
+
+  const { error } = await supabaseClient.from(CONNECTION_TABLE).delete().eq("id", connectionId);
+  if (error) {
+    throw error;
+  }
+
+  setSharedInviteStatus(message, "success");
+  await loadSharedData({ preserveSelection: false });
+}
+
+async function postSharedNote() {
+  const client = await ensureSupabaseClient();
+  if (!client || !cloudUser) {
+    openCloudModal();
+    setSharedNoteStatus("まずサインインしてください。", "error");
+    return;
+  }
+
+  const body = sharedNoteInput.value.trim();
+  if (!body) {
+    setSharedNoteStatus("メモを入力してください。", "error");
+    return;
+  }
+
+  const { error } = await client.from(NOTE_TABLE).insert({
+    author_id: cloudUser.id,
+    body,
+    updated_at: new Date().toISOString(),
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  sharedNoteInput.value = "";
+  setSharedNoteStatus("メモを共有しました。", "success");
+  await loadSharedData();
 }
 
 function loadState() {
@@ -518,6 +890,12 @@ function handleCloudError(error) {
   setCloudFeedback(error?.message || "Cloud sync failed.", "error");
 }
 
+function handleSharedError(error) {
+  console.error(error);
+  setSharedInviteStatus(error?.message || "共有機能でエラーが起きました。", "error");
+  setSharedNoteStatus(error?.message || "共有機能でエラーが起きました。", "error");
+}
+
 async function loadSupabaseModule() {
   if (!supabaseModulePromise) {
     supabaseModulePromise = import(SUPABASE_MODULE_URL);
@@ -533,7 +911,9 @@ async function ensureSupabaseClient() {
     cloudSession = null;
     cloudUser = null;
     loadedCloudUserId = "";
+    resetSharedCollections();
     renderCloudState();
+    renderSharedPage();
     return null;
   }
 
@@ -573,6 +953,7 @@ async function ensureSupabaseClient() {
 
   if (cloudUser) {
     await hydrateFromCloud();
+    await loadSharedData();
   }
 
   return supabaseClient;
@@ -696,7 +1077,9 @@ async function handleAuthStateChange(event, session) {
     cloudSyncPending = false;
     cloudSyncing = false;
     lastCloudSyncAt = "";
+    resetSharedCollections();
     renderCloudState();
+    renderSharedPage();
     if (event === "SIGNED_OUT") {
       setCloudFeedback("Signed out. The local copy stays on this device.", "success");
     }
@@ -712,6 +1095,7 @@ async function handleAuthStateChange(event, session) {
     loadedCloudUserId = "";
     renderCloudState();
     await hydrateFromCloud();
+    await loadSharedData();
   }
 }
 
@@ -1089,12 +1473,14 @@ function getRate(done, total) {
 
 function showReviewPage() {
   dashboardView.hidden = true;
+  sharedPage.hidden = true;
   reviewPage.hidden = false;
   renderReviewPage();
 }
 
 function showDashboard() {
   reviewPage.hidden = true;
+  sharedPage.hidden = true;
   dashboardView.hidden = false;
 }
 
@@ -1236,6 +1622,467 @@ function renderLineChart(svgElement, items) {
       )
       .join("")}
   `;
+}
+
+function getKnownDateKeysForBoard(boardState) {
+  const dateKeys = new Set(getMonthDates(getCurrentMonthKey()).map((date) => date.key));
+  Object.values(boardState.dateChecks || {}).forEach((taskChecks) => {
+    Object.keys(taskChecks || {}).forEach((dateKey) => dateKeys.add(dateKey));
+  });
+  return [...dateKeys].sort();
+}
+
+function getWeekRangesForBoard(boardState) {
+  const starts = new Map();
+  getKnownDateKeysForBoard(boardState).forEach((dateKey) => {
+    const weekStart = getWeekStartDate(new Date(`${dateKey}T00:00:00`));
+    const startKey = getDateKey(weekStart);
+    if (!starts.has(startKey)) {
+      const dates = Array.from({ length: 7 }, (_, index) => {
+        const date = addDays(weekStart, index);
+        return {
+          date,
+          key: getDateKey(date),
+        };
+      });
+      starts.set(startKey, {
+        id: startKey,
+        title: `Week of ${weekStart.toLocaleDateString("en", { month: "short", day: "numeric" })}`,
+        month: startKey.slice(0, 7),
+        dates,
+      });
+    }
+  });
+  return [...starts.values()].sort((a, b) => a.id.localeCompare(b.id));
+}
+
+function getBoardMonthStats(boardState, monthKey) {
+  const dates = getMonthDates(monthKey);
+  const [year, month] = monthKey.split("-").map(Number);
+  const date = new Date(year, month - 1, 1);
+  const done = dates.reduce((dateSum, item) => {
+    return dateSum + boardState.tasks.reduce((taskSum, task) => taskSum + Number(Boolean(boardState.dateChecks[task.id]?.[item.key])), 0);
+  }, 0);
+  const total = boardState.tasks.length * dates.length;
+
+  return {
+    title: date.toLocaleDateString("en", { month: "long" }),
+    chartLabel: date.toLocaleDateString("en", { month: "short" }),
+    done,
+    total,
+    rate: getRate(done, total),
+  };
+}
+
+function getBoardWeekStats(boardState, week) {
+  const done = week.dates.reduce((dateSum, date) => {
+    return dateSum + boardState.tasks.reduce((taskSum, task) => taskSum + Number(Boolean(boardState.dateChecks[task.id]?.[date.key])), 0);
+  }, 0);
+  const total = boardState.tasks.length * week.dates.length;
+
+  return {
+    title: week.title,
+    done,
+    total,
+    rate: getRate(done, total),
+  };
+}
+
+function getBoardMonthWeekStats(boardState, monthKey) {
+  return getWeekRangesForBoard(boardState)
+    .map((week) => ({
+      ...week,
+      dates: week.dates.filter((date) => date.key.startsWith(monthKey)),
+    }))
+    .filter((week) => week.dates.length)
+    .map((week) => getBoardWeekStats(boardState, week));
+}
+
+function getBoardYearMonthStats(boardState, yearKey) {
+  return getYearMonthKeys(yearKey).map((monthKey) => getBoardMonthStats(boardState, monthKey));
+}
+
+function getBoardDateStats(boardState, dateKey) {
+  const done = boardState.tasks.reduce((sum, task) => sum + Number(Boolean(boardState.dateChecks[task.id]?.[dateKey])), 0);
+  const total = boardState.tasks.length;
+  return {
+    done,
+    total,
+    rate: getRate(done, total),
+  };
+}
+
+function getBoardTopHabits(boardState, monthKey, limit = 3) {
+  const dates = getMonthDates(monthKey);
+  return boardState.tasks
+    .map((task) => {
+      const done = dates.reduce((sum, date) => sum + Number(Boolean(boardState.dateChecks[task.id]?.[date.key])), 0);
+      return {
+        id: task.id,
+        text: task.text,
+        done,
+        total: dates.length,
+        rate: getRate(done, dates.length),
+      };
+    })
+    .sort((a, b) => (b.rate - a.rate) || a.text.localeCompare(b.text))
+    .slice(0, limit);
+}
+
+function setSharedViewMode(mode) {
+  sharedViewMode = mode;
+  sharedBoardTabButton.classList.toggle("is-active", mode === "board");
+  sharedReviewTabButton.classList.toggle("is-active", mode === "review");
+  sharedNotesTabButton.classList.toggle("is-active", mode === "notes");
+  sharedBoardPane.hidden = mode !== "board";
+  sharedReviewPane.hidden = mode !== "review";
+  sharedNotesPane.hidden = mode !== "notes";
+}
+
+function renderFriendList(friends) {
+  friendsList.innerHTML = "";
+  friendsCountBadge.textContent = String(friends.length);
+
+  if (!friends.length) {
+    const empty = document.createElement("div");
+    empty.className = "shared-empty-list";
+    empty.textContent = "まだ友達がいません。";
+    friendsList.append(empty);
+    return;
+  }
+
+  friends.forEach((friend) => {
+    const tile = document.createElement("article");
+    const top = document.createElement("div");
+    const info = document.createElement("div");
+    const name = document.createElement("strong");
+    const meta = document.createElement("small");
+    const stats = document.createElement("div");
+    const todayStat = getBoardDateStats(friend.boardState, getTodayKey());
+    const monthStat = getBoardMonthStats(friend.boardState, getCurrentMonthKey());
+    const yearStats = getBoardYearMonthStats(friend.boardState, getCurrentYearKey());
+    const yearDone = yearStats.reduce((sum, item) => sum + item.done, 0);
+    const yearTotal = yearStats.reduce((sum, item) => sum + item.total, 0);
+    const statValues = [
+      `Today ${todayStat.rate}%`,
+      `Month ${monthStat.rate}%`,
+      `Year ${getRate(yearDone, yearTotal)}%`,
+    ];
+
+    tile.className = `friend-tile${friend.id === selectedFriendId ? " is-active" : ""}`;
+    top.className = "friend-tile-top";
+    stats.className = "friend-tile-stats";
+    name.textContent = friend.name;
+    meta.textContent = `${friend.email} · ${getSharedTimestampLabel(friend.updatedAt)}`;
+
+    tile.addEventListener("click", () => {
+      selectedFriendId = friend.id;
+      renderSharedPage();
+    });
+
+    statValues.forEach((label) => {
+      const stat = document.createElement("span");
+      stat.textContent = label;
+      stats.append(stat);
+    });
+
+    info.append(name, meta);
+    top.append(info);
+    tile.append(top, stats);
+    friendsList.append(tile);
+  });
+}
+
+function renderRequestList(container, items, type) {
+  container.innerHTML = "";
+
+  if (!items.length) {
+    const empty = document.createElement("div");
+    empty.className = "shared-empty-list";
+    empty.textContent = type === "incoming" ? "まだ届いていません。" : "送信中の招待はありません。";
+    container.append(empty);
+    return;
+  }
+
+  items.forEach((connection) => {
+    const card = document.createElement("article");
+    const name = document.createElement("strong");
+    const meta = document.createElement("small");
+    const actions = document.createElement("div");
+
+    card.className = "request-card";
+    actions.className = "request-actions";
+    name.textContent =
+      type === "incoming"
+        ? getProfileDisplayName(sharedProfiles.get(connection.requester_id), "Friend")
+        : connection.invitee_email;
+    meta.textContent = `${type === "incoming" ? "Incoming" : "Sent"} · ${getSharedTimestampLabel(connection.created_at)}`;
+
+    if (type === "incoming") {
+      const acceptButton = document.createElement("button");
+      const declineButton = document.createElement("button");
+      acceptButton.className = "cloud-primary";
+      declineButton.className = "cloud-secondary";
+      acceptButton.type = "button";
+      declineButton.type = "button";
+      acceptButton.textContent = "Accept";
+      declineButton.textContent = "Decline";
+      acceptButton.addEventListener("click", () => {
+        acceptFriendInvite(connection.id).catch(handleSharedError);
+      });
+      declineButton.addEventListener("click", () => {
+        removeFriendConnection(connection.id, "招待を断りました。").catch(handleSharedError);
+      });
+      actions.append(acceptButton, declineButton);
+    } else {
+      const cancelButton = document.createElement("button");
+      cancelButton.className = "cloud-secondary";
+      cancelButton.type = "button";
+      cancelButton.textContent = "Cancel";
+      cancelButton.addEventListener("click", () => {
+        removeFriendConnection(connection.id, "招待を取り消しました。").catch(handleSharedError);
+      });
+      actions.append(cancelButton);
+    }
+
+    card.append(name, meta, actions);
+    container.append(card);
+  });
+}
+
+function renderSharedHero(friend) {
+  const todayStats = getBoardDateStats(friend.boardState, getTodayKey());
+  const monthStats = getBoardMonthStats(friend.boardState, getCurrentMonthKey());
+  const yearStats = getBoardYearMonthStats(friend.boardState, getCurrentYearKey());
+  const yearDone = yearStats.reduce((sum, item) => sum + item.done, 0);
+  const yearTotal = yearStats.reduce((sum, item) => sum + item.total, 0);
+  const topHabits = getBoardTopHabits(friend.boardState, getCurrentMonthKey())
+    .map((item) => item.text)
+    .join(" / ") || "No habits yet";
+  const items = [
+    { label: "Today", value: `${todayStats.rate}%`, meta: `${todayStats.done} / ${todayStats.total} checks` },
+    { label: "This month", value: `${monthStats.rate}%`, meta: `${monthStats.done} / ${monthStats.total} checks` },
+    { label: "This year", value: `${getRate(yearDone, yearTotal)}%`, meta: topHabits },
+  ];
+
+  sharedHeroStats.innerHTML = "";
+  items.forEach((item) => {
+    const card = document.createElement("article");
+    const label = document.createElement("span");
+    const value = document.createElement("strong");
+    const meta = document.createElement("small");
+
+    card.className = "shared-stat-card";
+    label.textContent = item.label;
+    value.textContent = item.value;
+    meta.textContent = item.meta;
+
+    card.append(label, value, meta);
+    sharedHeroStats.append(card);
+  });
+}
+
+function renderSharedBoard(friend) {
+  const dates = getMonthDates(getCurrentMonthKey());
+  const groups = getDateGroupsFromDates(dates);
+  const boardState = friend.boardState;
+  sharedBoardDateLabel.textContent = formatMonthKey(getCurrentMonthKey());
+  sharedBoardPreview.innerHTML = "";
+
+  const board = document.createElement("div");
+  board.className = "shared-board-view";
+
+  const taskColumn = document.createElement("section");
+  taskColumn.className = "shared-task-column";
+  const taskHeader = document.createElement("div");
+  taskHeader.className = "shared-task-column-header";
+  taskHeader.textContent = "Tasks";
+  taskColumn.append(taskHeader);
+
+  boardState.tasks.forEach((task) => {
+    const row = document.createElement("div");
+    row.className = "shared-task-row";
+    row.textContent = task.text;
+    taskColumn.append(row);
+  });
+
+  board.append(taskColumn);
+
+  groups.forEach((group, groupIndex) => {
+    const groupElement = document.createElement("section");
+    groupElement.className = `shared-date-group${group.dates.some((date) => date.isToday) ? " has-today" : ""}`;
+    groupElement.style.setProperty("--week-color", colors[groupIndex % colors.length]);
+
+    const header = document.createElement("div");
+    header.className = "shared-date-group-header";
+    header.textContent = getDateGroupTitle(group);
+    groupElement.append(header);
+
+    const dateHeader = document.createElement("div");
+    dateHeader.className = "shared-date-header";
+    group.dates.forEach((date) => {
+      const dateCell = document.createElement("div");
+      dateCell.className = `shared-date-head-cell${date.isToday ? " is-today" : ""}`;
+      dateCell.innerHTML = `<span>${date.day}</span><strong>${date.label}</strong><small>${date.month}</small>`;
+      dateHeader.append(dateCell);
+    });
+    groupElement.append(dateHeader);
+
+    boardState.tasks.forEach((task) => {
+      const row = document.createElement("div");
+      const track = document.createElement("div");
+
+      row.className = "shared-check-row";
+      track.className = "shared-check-track";
+
+      group.dates.forEach((date) => {
+        const dot = document.createElement("span");
+        dot.className = `shared-check${boardState.dateChecks[task.id]?.[date.key] ? " is-done" : ""}`;
+        track.append(dot);
+      });
+
+      row.append(track);
+      groupElement.append(row);
+    });
+
+    board.append(groupElement);
+  });
+
+  sharedBoardPreview.append(board);
+}
+
+function renderSharedReview(friend) {
+  const monthStats = getBoardMonthWeekStats(friend.boardState, getCurrentMonthKey());
+  const chartItems = monthStats.length
+    ? monthStats.map((item) => ({
+        ...item,
+        chartLabel: item.title.replace("Week of ", ""),
+      }))
+    : [{ title: "This month", chartLabel: "Now", done: 0, total: 0, rate: 0 }];
+
+  sharedReviewChartTitle.textContent = `${formatMonthKey(getCurrentMonthKey())} progress curve`;
+  renderLineChart(sharedReviewChart, chartItems);
+  sharedReviewGrid.innerHTML = "";
+
+  chartItems.forEach((item) => {
+    const card = document.createElement("article");
+    const title = document.createElement("h2");
+    const score = document.createElement("strong");
+    const meta = document.createElement("span");
+    const track = document.createElement("div");
+    const fill = document.createElement("span");
+
+    card.className = "review-detail-card";
+    title.textContent = item.title;
+    score.textContent = `${item.rate}%`;
+    meta.textContent = `${item.done} / ${item.total} checks`;
+    track.className = "rate-track";
+    fill.style.width = `${item.rate}%`;
+    track.append(fill);
+    card.append(title, score, meta, track);
+    sharedReviewGrid.append(card);
+  });
+}
+
+function renderSharedNotes(friend) {
+  const relevantNotes = sharedNotes.filter((note) => note.author_id === cloudUser?.id || note.author_id === friend.id);
+  sharedFriendNotesList.innerHTML = "";
+
+  if (!relevantNotes.length) {
+    const empty = document.createElement("div");
+    empty.className = "shared-empty-list";
+    empty.textContent = "まだ共有メモはありません。";
+    sharedFriendNotesList.append(empty);
+    return;
+  }
+
+  relevantNotes.forEach((note) => {
+    const card = document.createElement("article");
+    const top = document.createElement("div");
+    const author = document.createElement("strong");
+    const meta = document.createElement("span");
+    const body = document.createElement("p");
+    const isSelf = note.author_id === cloudUser?.id;
+    const authorProfile = isSelf ? null : sharedProfiles.get(friend.id);
+
+    card.className = `shared-note-card${isSelf ? " is-self" : ""}`;
+    top.className = "shared-note-top";
+    meta.className = "shared-note-meta";
+    author.textContent = isSelf ? "You" : getProfileDisplayName(authorProfile, friend.email);
+    meta.textContent = getSharedTimestampLabel(note.created_at);
+    body.textContent = note.body;
+
+    top.append(author, meta);
+    card.append(top, body);
+    sharedFriendNotesList.append(card);
+  });
+}
+
+function renderSharedPage() {
+  const signedIn = Boolean(cloudUser);
+  const acceptedFriends = getAcceptedFriends();
+  const incoming = getIncomingRequests();
+  const outgoing = getOutgoingRequests();
+  const selectedFriend = acceptedFriends.find((friend) => friend.id === selectedFriendId) || null;
+
+  incomingCountBadge.textContent = String(incoming.length);
+  outgoingCountBadge.textContent = String(outgoing.length);
+  renderFriendList(acceptedFriends);
+  renderRequestList(incomingRequestsList, incoming, "incoming");
+  renderRequestList(outgoingRequestsList, outgoing, "outgoing");
+
+  friendInviteEmailInput.disabled = !signedIn || !sharedSchemaReady;
+  sendFriendInviteButton.disabled = !signedIn || !sharedSchemaReady;
+  sharedNoteInput.disabled = !signedIn || !sharedSchemaReady || !selectedFriend;
+  postSharedNoteButton.disabled = !signedIn || !sharedSchemaReady || !selectedFriend;
+
+  if (!signedIn) {
+    sharedPageStatusTag.textContent = "Sign in";
+    sharedPageStatusText.textContent = "Sign in to invite friends and see each other's board.";
+    sharedEmptyState.hidden = false;
+    sharedDetail.hidden = true;
+    return;
+  }
+
+  if (!sharedSchemaReady) {
+    sharedPageStatusTag.textContent = "Setup";
+    sharedPageStatusText.textContent = "Supabase に最新の SQL を流すと、共有機能がここで動きます。";
+    sharedEmptyState.hidden = false;
+    sharedDetail.hidden = true;
+    return;
+  }
+
+  sharedPageStatusTag.textContent = acceptedFriends.length ? "Connected" : "Ready";
+  sharedPageStatusText.textContent = acceptedFriends.length
+    ? `${acceptedFriends.length}人とつながっています。相手のボードはここで確認できます。`
+    : "友達を招待すると、ここに相手のボードとメモが表示されます。";
+
+  if (!selectedFriend) {
+    sharedEmptyState.hidden = false;
+    sharedDetail.hidden = true;
+    return;
+  }
+
+  sharedEmptyState.hidden = true;
+  sharedDetail.hidden = false;
+  sharedFriendMeta.textContent = "Connected friend";
+  sharedFriendName.textContent = selectedFriend.name;
+  sharedFriendStatus.textContent = `${selectedFriend.email} · Last sync ${getSharedTimestampLabel(selectedFriend.updatedAt)}`;
+  renderSharedHero(selectedFriend);
+  renderSharedBoard(selectedFriend);
+  renderSharedReview(selectedFriend);
+  renderSharedNotes(selectedFriend);
+  setSharedViewMode(sharedViewMode);
+}
+
+function showSharedPage() {
+  dashboardView.hidden = true;
+  reviewPage.hidden = true;
+  sharedPage.hidden = false;
+  renderSharedPage();
+  if (cloudUser) {
+    loadSharedData().catch(handleSharedError);
+  }
 }
 
 function renamePreset(id, value) {
@@ -1514,6 +2361,7 @@ reviewPageWeeklyButton.addEventListener("click", () => setReviewMode("weekly"));
 reviewPageMonthlyButton.addEventListener("click", () => setReviewMode("monthly"));
 reviewPageYearlyButton.addEventListener("click", () => setReviewMode("yearly"));
 backToDashboardButton.addEventListener("click", showDashboard);
+backFromSharedButton.addEventListener("click", showDashboard);
 monthSelect.addEventListener("change", () => {
   state.selectedMonth = monthSelect.value;
   saveState();
@@ -1532,8 +2380,15 @@ reviewWeekSelect.addEventListener("change", () => {
 input.addEventListener("keydown", (event) => {
   if (event.key === "Enter") addTask();
 });
+friendInviteEmailInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    sendFriendInvite().catch(handleSharedError);
+  }
+});
 
 window.addEventListener("resize", applyResponsiveLayout);
+sharedPageButton.addEventListener("click", showSharedPage);
 authOpenButton.addEventListener("click", openCloudModal);
 cloudModalBackdrop.addEventListener("click", closeCloudModal);
 cloudModalCloseButton.addEventListener("click", closeCloudModal);
@@ -1546,6 +2401,21 @@ signUpButton.addEventListener("click", () => {
 authPasswordToggle.addEventListener("click", () => {
   authPasswordInput.type = authPasswordInput.type === "password" ? "text" : "password";
   renderPasswordVisibility();
+});
+sendFriendInviteButton.addEventListener("click", () => {
+  sendFriendInvite().catch(handleSharedError);
+});
+postSharedNoteButton.addEventListener("click", () => {
+  postSharedNote().catch(handleSharedError);
+});
+sharedBoardTabButton.addEventListener("click", () => {
+  setSharedViewMode("board");
+});
+sharedReviewTabButton.addEventListener("click", () => {
+  setSharedViewMode("review");
+});
+sharedNotesTabButton.addEventListener("click", () => {
+  setSharedViewMode("notes");
 });
 syncNowButton.addEventListener("click", () => {
   queueCloudSync({ immediate: true, showMessage: true });
@@ -1583,5 +2453,6 @@ applyResponsiveLayout();
 renderSidebarState();
 render();
 renderCloudState();
+renderSharedPage();
 renderPasswordVisibility();
 ensureSupabaseClient().catch(handleCloudError);

@@ -405,6 +405,11 @@ function setSharedNoteStatus(message = "", tone = "") {
   }
 }
 
+function resetSharedFeedback() {
+  setSharedInviteStatus();
+  setSharedNoteStatus();
+}
+
 function getCurrentUserEmail() {
   return cloudUser?.email?.trim().toLowerCase() || "";
 }
@@ -439,6 +444,7 @@ function resetSharedCollections() {
   sharedBoards = new Map();
   sharedNotes = [];
   selectedFriendId = "";
+  resetSharedFeedback();
 }
 
 function getFriendIdFromConnection(connection) {
@@ -1087,6 +1093,7 @@ async function handleAuthStateChange(event, session) {
   cloudSession = session;
   cloudUser = session?.user || null;
   sanitizeTaskInputAutofill();
+  resetSharedFeedback();
   if (!cloudUser) {
     loadedCloudUserId = "";
     cloudSyncPending = false;
@@ -2094,6 +2101,7 @@ function showSharedPage() {
   dashboardView.hidden = true;
   reviewPage.hidden = true;
   sharedPage.hidden = false;
+  resetSharedFeedback();
   renderSharedPage();
   if (cloudUser) {
     loadSharedData().catch(handleSharedError);

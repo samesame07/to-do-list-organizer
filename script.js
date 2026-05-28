@@ -486,17 +486,34 @@ function getAcceptedFriends() {
   return [...entries.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
+function isResolvedByAcceptedFriend(connection) {
+  const acceptedFriends = getAcceptedFriends();
+  const inviteEmail = (connection.invitee_email || "").toLowerCase();
+
+  return acceptedFriends.some((friend) => {
+    const friendEmail = (friend.email || "").toLowerCase();
+    return (friend.id && friend.id === connection.requester_id)
+      || (friend.id && friend.id === connection.invitee_id)
+      || (inviteEmail && friendEmail && inviteEmail === friendEmail);
+  });
+}
+
 function getIncomingRequests() {
   const currentUserEmail = getCurrentUserEmail();
   return sharedConnections.filter((connection) => {
     if (connection.status !== "pending") return false;
     if (connection.requester_id === cloudUser?.id) return false;
-    return connection.invitee_id === cloudUser?.id || connection.invitee_email === currentUserEmail;
+    if (!(connection.invitee_id === cloudUser?.id || connection.invitee_email === currentUserEmail)) return false;
+    return !isResolvedByAcceptedFriend(connection);
   });
 }
 
 function getOutgoingRequests() {
-  return sharedConnections.filter((connection) => connection.status === "pending" && connection.requester_id === cloudUser?.id);
+  return sharedConnections.filter((connection) => {
+    if (connection.status !== "pending") return false;
+    if (connection.requester_id !== cloudUser?.id) return false;
+    return !isResolvedByAcceptedFriend(connection);
+  });
 }
 
 async function upsertOwnProfile() {
@@ -2043,6 +2060,9 @@ function renderSharedNotes(friend) {
 function renderSharedPage() {
   const signedIn = Boolean(cloudUser);
   const acceptedFriends = getAcceptedFriends();
+  if (acceptedFriends.length && !acceptedFriends.some((friend) => friend.id === selectedFriendId)) {
+    selectedFriendId = acceptedFriends[0].id;
+  }
   const incoming = getIncomingRequests();
   const outgoing = getOutgoingRequests();
   const selectedFriend = acceptedFriends.find((friend) => friend.id === selectedFriendId) || null;

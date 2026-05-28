@@ -1197,12 +1197,22 @@ textarea {
   display: grid;
   gap: 12px;
   align-content: start;
+  min-width: 0;
 }
 
 .shared-card {
   border: 1px solid var(--line);
   background: white;
   padding: 14px;
+  min-width: 0;
+}
+
+.shared-empty-state[hidden],
+.shared-detail[hidden],
+.shared-board-pane[hidden],
+.shared-review-pane[hidden],
+.shared-notes-pane[hidden] {
+  display: none !important;
 }
 
 .shared-card p,
@@ -1408,6 +1418,7 @@ textarea {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+  min-width: 0;
 }
 
 .shared-stat-card {
@@ -1436,6 +1447,7 @@ textarea {
 
 .shared-board-shell {
   overflow-x: auto;
+  max-width: 100%;
 }
 
 .shared-board-view {
@@ -1443,6 +1455,7 @@ textarea {
   grid-auto-flow: column;
   grid-template-columns: 186px;
   grid-auto-columns: minmax(238px, 1fr);
+  min-width: max-content;
 }
 
 .shared-task-column {

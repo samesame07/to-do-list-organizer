@@ -338,6 +338,20 @@ function formatCloudSyncTime(value) {
   }).format(new Date(value));
 }
 
+function looksLikeEmail(value = "") {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function sanitizeTaskInputAutofill() {
+  const currentValue = input?.value?.trim() || "";
+  if (!currentValue || !looksLikeEmail(currentValue)) return;
+
+  const knownEmails = [getCurrentUserEmail(), authEmailInput?.value?.trim().toLowerCase()].filter(Boolean);
+  if (knownEmails.includes(currentValue.toLowerCase())) {
+    input.value = "";
+  }
+}
+
 function renderCloudState() {
   const configured = hasCloudConfig();
   const signedIn = Boolean(cloudUser);
@@ -1072,6 +1086,7 @@ async function hydrateFromCloud() {
 async function handleAuthStateChange(event, session) {
   cloudSession = session;
   cloudUser = session?.user || null;
+  sanitizeTaskInputAutofill();
   if (!cloudUser) {
     loadedCloudUserId = "";
     cloudSyncPending = false;
@@ -2130,6 +2145,7 @@ function formatPresetDate(value) {
 function render() {
   state = normalizeState(state);
   weeksElement.innerHTML = "";
+  sanitizeTaskInputAutofill();
   renderPresetOptions();
   renderReviewRate();
 

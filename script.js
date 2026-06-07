@@ -156,6 +156,11 @@ const signOutButton = document.querySelector("#signOutButton");
 const cloudModal = document.querySelector("#cloudModal");
 const cloudModalBackdrop = document.querySelector("#cloudModalBackdrop");
 const cloudModalCloseButton = document.querySelector("#cloudModalCloseButton");
+const cloudConflictModal = document.querySelector("#cloudConflictModal");
+const cloudConflictMessage = document.querySelector("#cloudConflictMessage");
+const cloudConflictMeta = document.querySelector("#cloudConflictMeta");
+const cloudConflictKeepLocalButton = document.querySelector("#cloudConflictKeepLocalButton");
+const cloudConflictLoadCloudButton = document.querySelector("#cloudConflictLoadCloudButton");
 const authPanelStatus = document.querySelector("#authPanelStatus");
 const authEmailInput = document.querySelector("#authEmailInput");
 const authPasswordInput = document.querySelector("#authPasswordInput");
@@ -220,6 +225,7 @@ let sharedBoards = new Map();
 let sharedNotes = [];
 let selectedFriendId = "";
 let sharedViewMode = "board";
+let resolveCloudConflictChoice = null;
 
 function getInitialSidebarState() {
   const saved = localStorage.getItem("organize-labs-sidebar-open");
@@ -322,6 +328,39 @@ function openCloudModal() {
 function closeCloudModal() {
   cloudModal.hidden = true;
   cloudModal.setAttribute("aria-hidden", "true");
+}
+
+function openCloudConflictModal(message, meta = "") {
+  cloudConflictMessage.textContent = message;
+  cloudConflictMeta.textContent = meta;
+  cloudConflictModal.hidden = false;
+  cloudConflictModal.setAttribute("aria-hidden", "false");
+}
+
+function closeCloudConflictModal() {
+  cloudConflictModal.hidden = true;
+  cloudConflictModal.setAttribute("aria-hidden", "true");
+}
+
+function requestCloudConflictChoice(remoteRow) {
+  const remoteUpdatedAt = remoteRow?.updated_at ? formatCloudSyncTime(remoteRow.updated_at) : "";
+  const message =
+    "このアカウントには既存のクラウドデータがあります。『クラウドを読み込む』を押すと、今この端末に見えている内容はクラウドの内容に置き換わります。『この端末の内容を使う』を押すと、今この端末の内容でクラウドを上書きします。";
+  const meta = remoteUpdatedAt ? `クラウドの最終保存: ${remoteUpdatedAt}` : "";
+
+  openCloudConflictModal(message, meta);
+
+  return new Promise((resolve) => {
+    resolveCloudConflictChoice = resolve;
+  });
+}
+
+function settleCloudConflictChoice(choice) {
+  if (!resolveCloudConflictChoice) return;
+  const resolve = resolveCloudConflictChoice;
+  resolveCloudConflictChoice = null;
+  closeCloudConflictModal();
+  resolve(choice);
 }
 
 function setCloudFeedback(message = "", tone = "") {
@@ -1094,11 +1133,11 @@ async function hydrateFromCloud() {
   const shouldPrompt = localMeaningful && remoteSnapshotText !== localSnapshotText;
 
   if (shouldPrompt) {
-    const useRemote = window.confirm("このアカウントには既存のクラウドデータがあります。OKでクラウドを読み込み、キャンセルでこの端末の内容をクラウドへ上書きします。");
-    if (!useRemote) {
+    const choice = await requestCloudConflictChoice(remoteRow);
+    if (choice === "local") {
       loadedCloudUserId = cloudUser.id;
       await syncCloudNow({ showMessage: true });
-      setCloudFeedback("This device's board is now the cloud version.", "success");
+      setCloudFeedback("この端末の内容をクラウドに保存しました。", "success");
       return;
     }
   }
@@ -1107,7 +1146,7 @@ async function hydrateFromCloud() {
   loadedCloudUserId = cloudUser.id;
   lastCloudSyncAt = remoteRow.updated_at || "";
   renderCloudState();
-  setCloudFeedback("Cloud board loaded.", "success");
+  setCloudFeedback("クラウドの内容を読み込みました。", "success");
 }
 
 async function handleAuthStateChange(event, session) {
@@ -2440,6 +2479,12 @@ sharedPageButton.addEventListener("click", showSharedPage);
 authOpenButton.addEventListener("click", openCloudModal);
 cloudModalBackdrop.addEventListener("click", closeCloudModal);
 cloudModalCloseButton.addEventListener("click", closeCloudModal);
+cloudConflictKeepLocalButton.addEventListener("click", () => {
+  settleCloudConflictChoice("local");
+});
+cloudConflictLoadCloudButton.addEventListener("click", () => {
+  settleCloudConflictChoice("cloud");
+});
 signInButton.addEventListener("click", () => {
   signInWithEmail().catch(handleCloudError);
 });

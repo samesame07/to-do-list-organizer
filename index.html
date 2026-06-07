@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Organize Labs Todo</title>
-    <link rel="stylesheet" href="styles.css?v=20260608c" />
+    <link rel="stylesheet" href="styles.css?v=20260608d" />
   </head>
   <body>
     <main class="app-shell">
@@ -345,7 +345,33 @@
       </div>
     </section>
 
-    <script src="cloud-config.js?v=20260608a"></script>
-    <script src="script.js?v=20260608a"></script>
+    <section class="cloud-modal-shell" id="cloudConflictModal" hidden aria-hidden="true">
+      <div class="cloud-modal-backdrop"></div>
+      <div class="cloud-modal cloud-conflict-modal" role="dialog" aria-modal="true" aria-labelledby="cloudConflictTitle">
+        <header class="cloud-modal-head">
+          <div>
+            <span>Cloud Sync</span>
+            <h2 id="cloudConflictTitle">どちらの内容を使うか選んでください</h2>
+          </div>
+        </header>
+
+        <div class="cloud-modal-grid is-single">
+          <section class="cloud-panel">
+            <p id="cloudConflictMessage">
+              このアカウントには既存のクラウドデータがあります。どちらを残すか選んでください。
+            </p>
+            <p class="cloud-note" id="cloudConflictMeta"></p>
+
+            <div class="cloud-panel-actions cloud-conflict-actions">
+              <button class="cloud-secondary" id="cloudConflictKeepLocalButton" type="button">この端末の内容を使う</button>
+              <button class="cloud-primary" id="cloudConflictLoadCloudButton" type="button">クラウドを読み込む</button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <script src="cloud-config.js?v=20260608d"></script>
+    <script src="script.js?v=20260608d"></script>
   </body>
 </html>

@@ -318,6 +318,14 @@ textarea {
   border-left: 1px solid var(--line);
 }
 
+.cloud-conflict-modal {
+  width: min(680px, 100%);
+}
+
+.cloud-conflict-actions {
+  justify-content: flex-end;
+}
+
 .cloud-panel h3 {
   margin: 0 0 10px;
   font-size: 1rem;

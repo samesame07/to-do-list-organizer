@@ -713,10 +713,12 @@ textarea {
 }
 
 .task-column-header {
-  min-height: 72px;
+  min-height: 0;
+  height: 82px;
+  box-sizing: border-box;
   display: grid;
   align-items: center;
-  padding: 10px 9px;
+  padding: 0 9px;
   border-bottom: 1px solid var(--line);
   background: #eef1f5;
   color: #59616d;
@@ -1469,10 +1471,12 @@ textarea {
 }
 
 .shared-task-column-header {
-  min-height: 72px;
+  min-height: 0;
+  height: 82px;
+  box-sizing: border-box;
   display: grid;
   align-items: center;
-  padding: 10px 9px;
+  padding: 0 9px;
   border-bottom: 1px solid var(--line);
   background: #eef1f5;
   color: #59616d;
@@ -1905,8 +1909,9 @@ textarea {
   }
 
   .task-column-header {
-    min-height: 66px;
-    padding: 8px;
+    min-height: 0;
+    height: 74px;
+    padding: 0 8px;
     font-size: 0.72rem;
   }
 
@@ -2080,8 +2085,9 @@ textarea {
   }
 
   .shared-task-column-header {
-    min-height: 66px;
-    padding: 8px;
+    min-height: 0;
+    height: 74px;
+    padding: 0 8px;
     font-size: 0.72rem;
   }
 

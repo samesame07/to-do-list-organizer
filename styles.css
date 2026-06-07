@@ -1846,6 +1846,11 @@ textarea {
     padding: 0 10px 10px;
   }
 
+  .mobile-review-host .review-box {
+    border: 1px solid var(--line);
+    background: white;
+  }
+
   .mobile-progress-host .progress-box,
   .mobile-actions-box .bar-actions {
     width: 100%;

@@ -567,7 +567,8 @@ textarea {
 
 .mobile-progress-host,
 .mobile-actions-box,
-.mobile-sidebar-host {
+.mobile-sidebar-host,
+.mobile-review-host {
   display: none;
 }
 
@@ -1838,6 +1839,11 @@ textarea {
 
   .mobile-sidebar-host:not(:empty) {
     display: block;
+  }
+
+  .mobile-review-host:not(:empty) {
+    display: block;
+    padding: 0 10px 10px;
   }
 
   .mobile-progress-host .progress-box,

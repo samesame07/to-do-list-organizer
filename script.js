@@ -146,6 +146,7 @@ const reviewBox = document.querySelector(".review-box");
 const mobileProgressHost = document.querySelector("#mobileProgressHost");
 const mobileActionsHost = document.querySelector("#mobileActionsHost");
 const mobileSidebarHost = document.querySelector("#mobileSidebarHost");
+const mobileReviewHost = document.querySelector("#mobileReviewHost");
 const cloudStatusLabel = document.querySelector("#cloudStatusLabel");
 const cloudStatusDetail = document.querySelector("#cloudStatusDetail");
 const sharedPageButton = document.querySelector("#sharedPageButton");
@@ -245,6 +246,9 @@ function applyResponsiveLayout() {
     if (mobileSidebarHost && presetSidebar && mobileSidebarHost.firstElementChild !== presetSidebar) {
       mobileSidebarHost.append(presetSidebar);
     }
+    if (mobileReviewHost && reviewBox && mobileReviewHost.firstElementChild !== reviewBox) {
+      mobileReviewHost.append(reviewBox);
+    }
   } else {
     if (sheetBar && barActions && sheetBar.lastElementChild !== barActions) {
       sheetBar.append(barActions);
@@ -252,8 +256,8 @@ function applyResponsiveLayout() {
     if (dailyBox && progressBox && progressBox.nextElementSibling !== dailyBox) {
       dailyBox.before(progressBox);
     }
-    if (reviewBox && dailyBox && reviewBox.previousElementSibling !== dailyBox) {
-      reviewBox.before(dailyBox);
+    if (reviewBox && mobileSidebarHost && reviewBox.previousElementSibling !== mobileSidebarHost) {
+      mobileSidebarHost.after(reviewBox);
     }
     if (mainPanel && presetSidebar && presetSidebar.nextElementSibling !== mainPanel) {
       mainPanel.before(presetSidebar);
